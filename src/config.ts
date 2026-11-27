@@ -20,6 +20,7 @@ export const REPO = {
 // Пока поля пустые, сайт работает в демо-режиме: оценки и комментарии
 // сохраняются только в браузере того, кто их оставил.
 export const BACKEND = {
-  supabaseUrl: '', // например: https://abcdefgh.supabase.co
-  supabaseAnonKey: '', // публичный anon-ключ из настроек проекта Supabase
+  supabaseUrl: 'https://wbbsazzdsilkxjhqqwxs.supabase.co',
+  // публичный ключ (Publishable key) — его можно показывать, секретный ключ сюда НЕ вписывать
+  supabaseAnonKey: 'sb_publishable_8AKZ82R9_vqLAm2PZW0RrQ_OcYPat-q',
 };

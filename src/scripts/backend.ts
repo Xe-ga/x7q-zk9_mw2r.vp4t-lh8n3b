@@ -76,7 +76,8 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
       method: 'POST',
       headers: {
         apikey: BACKEND.supabaseAnonKey,
-        Authorization: `Bearer ${BACKEND.supabaseAnonKey}`,
+        // старые anon-ключи (eyJ…) передаются ещё и как токен; новым sb_publishable_ это не нужно
+        ...(BACKEND.supabaseAnonKey.startsWith('eyJ') ? { Authorization: `Bearer ${BACKEND.supabaseAnonKey}` } : {}),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(args),
