@@ -71,8 +71,8 @@ const one = trs[0];
             <>
               {one.port && <span class="tag tag--port tag--big" title="Перенос готового перевода на другую версию игры">Порт</span>}
               <TypeTag type={one.type} big link />
-              <VerdictTag verdict={one.verdict} label={one.verdictLabel} note={one.verdictNote} by={one.mod?.name} big link />
               <StatusTag status={one.status} updating={one.updating} note={one.statusNote} big link />
+              <VerdictTag verdict={one.verdict} label={one.verdictLabel} note={one.verdictNote} by={one.mod?.name} big link />
             </>
           )}
         </div>
@@ -105,18 +105,16 @@ const one = trs[0];
               <header class="tcard__head">
                 {t.port && <span class="tag tag--port tag--big" title="Перенос готового перевода на другую версию игры">Порт</span>}
                 <TypeTag type={t.type} big link />
-                <VerdictTag verdict={t.verdict} label={t.verdictLabel} note={t.verdictNote} by={t.mod?.name} big link />
+                <StatusTag status={t.status} updating={t.updating} gaps={t.gaps} custom={t.gapsCustom} note={t.statusNote} big link />
+                <span class="tcard__verdict">
+                  <VerdictTag verdict={t.verdict} label={t.verdictLabel} note={t.verdictNote} by={t.mod?.name} big link />
+                  {t.verdict && t.verdict !== 'untested' && t.mod && (
+                    <a class="modpill" href={u(`/moderators/${t.mod.id}/`)} title={`Рекомендацию поставил модератор ${t.mod.name}`}><Icon name="user" />{t.mod.name}</a>
+                  )}
+                </span>
                 {t.date && <span class="label muted tcard__date">добавлен {fmtDate(t.date)}</span>}
               </header>
-              <p class="tcard__hint muted">
-                {t.verdictNote?.trim() ? <span class="tcard__why">{t.verdictNote.trim().replace(/\.$/, '')}.</span> : <>{VERDICTS[verdictOf(t)].hint}.</>}
-                {t.verdict && t.verdict !== 'untested' && t.mod && (
-                  <a class="modpill" href={u(`/moderators/${t.mod.id}/`)} title={`Рекомендацию поставил модератор ${t.mod.name}`}><Icon name="user" />{t.mod.name}</a>
-                )}
-              </p>
-              <div class="tcard__state">
-                <StatusTag status={t.status} updating={t.updating} gaps={t.gaps} custom={t.gapsCustom} note={t.statusNote} showNote big link />
-              </div>
+              {t.statusNote && <p class="status-note tcard__snote"><b aria-hidden="true">*</b> {t.statusNote}</p>}
               {t.port && t.originalUrl && (
                 <p class="tcard__port">
                   <a href={t.originalUrl} rel="noopener" target="_blank">Оригинальный перевод <Icon name="external-link" /></a>
@@ -142,6 +140,22 @@ const one = trs[0];
                   ))}
                 </p>
               )}
+              {(t.moderatorNote || t.translatorNote) && (
+                <div class="tcard__notes">
+                  {t.moderatorNote && (
+                    <section class="note note--mod">
+                      <span class="note__tab label">Модератор{t.mod && <>: <a class="note__who" href={u(`/moderators/${t.mod.id}/`)} title={`Кто такой ${t.mod.name} и как проверяет переводы`}>{t.mod.name}</a></>}</span>
+                      <p>{t.moderatorNote}</p>
+                    </section>
+                  )}
+                  {t.translatorNote && (
+                    <section class="note note--tr">
+                      <span class="note__tab label">{t.port && t.porters[0] ? `От портировщика: ${t.porters[0].name}` : `От переводчика${t.people[0] ? `: ${t.people[0].name}` : ''}`}</span>
+                      <p>{t.translatorNote}</p>
+                    </section>
+                  )}
+                </div>
+              )}
             </div>
             <div class="tcard__side">
               <div class="dl">
@@ -160,22 +174,6 @@ const one = trs[0];
               <Rating gameId={game.id} tkey={t.key} allKeys={keys} />
             </div>
           </div>
-          {(t.moderatorNote || t.translatorNote) && (
-            <div class="tcard__notes">
-              {t.moderatorNote && (
-                <section class="note note--mod">
-                  <span class="note__tab label">Модератор{t.mod && <>: <a class="note__who" href={u(`/moderators/${t.mod.id}/`)} title={`Кто такой ${t.mod.name} и как проверяет переводы`}>{t.mod.name}</a></>}</span>
-                  <p>{t.moderatorNote}</p>
-                </section>
-              )}
-              {t.translatorNote && (
-                <section class="note note--tr">
-                  <span class="note__tab label">{t.port && t.porters[0] ? `От портировщика: ${t.porters[0].name}` : `От переводчика${t.people[0] ? `: ${t.people[0].name}` : ''}`}</span>
-                  <p>{t.translatorNote}</p>
-                </section>
-              )}
-            </div>
-          )}
         </article>
       ))}
     </section>
@@ -334,13 +332,6 @@ const one = trs[0];
   .tcard__date {
     margin-left: auto;
   }
-  .tcard__state {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    margin-top: 10px;
-  }
   .tcard__hint {
     margin: 0.7rem 0 0;
     font-size: 0.95rem;
@@ -404,9 +395,16 @@ const one = trs[0];
   }
   /* ниже, на всю ширину: комментарии модератора и переводчика */
   .tcard__notes {
-    margin-top: 1.4rem;
-    padding-top: 0.6rem;
-    border-top: var(--bw-thin) dashed var(--ink-2);
+    margin-top: 1.9rem;
+  }
+  .tcard__verdict {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .tcard__snote {
+    margin: 0.6rem 0 0;
   }
   /* плашка переводчика: крупная и заметная */
   .person {
