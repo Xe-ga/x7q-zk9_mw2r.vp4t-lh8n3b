@@ -21,6 +21,10 @@ const sortByName = (a: { name: string }, b: { name: string }) => a.name.localeCo
 const translators = (await getCollection('translators')).map((t) => ({ id: t.id, name: t.data.name })).sort(sortByName);
 const publishers = (await getCollection('publishers')).map((p) => ({ id: p.id, name: p.data.name })).sort(sortByName);
 const moderators = (await getCollection('moderators')).map((m) => ({ id: m.id, name: m.data.name })).sort(sortByName);
+// свои отметки «что не переведено», которые уже кто-то использовал, — общий список для всех модераторов
+const customGaps = [...new Set(games.flatMap((g) => g.data.translations.flatMap((t) => t.gapsCustom.map((x) => x.trim()))))]
+  .filter(Boolean)
+  .sort((a, b) => a.localeCompare(b, 'ru'));
 
 const DATA = {
   base: import.meta.env.BASE_URL,
@@ -65,7 +69,7 @@ const DATA = {
             <input class="field" id="f-title" name="title" required placeholder="Как на коробке или в английской версии" />
           </div>
           <div class="f">
-            <label class="label" for="f-alt">Другие названия</label>
+            <label class="label" for="f-alt">Другие названия <span class="opt">необязательно</span></label>
             <textarea class="field f--short" id="f-alt" name="altTitles" placeholder="По одному в строке: японское, европейское… По ним тоже ищут"></textarea>
           </div>
           <div class="f2">
@@ -77,13 +81,13 @@ const DATA = {
               </select>
             </div>
             <div class="f">
-              <label class="label" for="f-year">Год выхода игры</label>
+              <label class="label" for="f-year">Год выхода <span class="opt">необязательно</span></label>
               <input class="field" id="f-year" name="year" type="number" min="1970" max="2100" inputmode="numeric" />
             </div>
           </div>
           <div class="f2">
             <div class="f">
-              <label class="label" for="f-pub">Издатель</label>
+              <label class="label" for="f-pub">Издатель <span class="opt">необязательно</span></label>
               <select class="field" id="f-pub" name="publisher">
                 <option value="">— не указан —</option>
                 {publishers.map((p) => <option value={p.id}>{p.name}</option>)}
@@ -92,12 +96,12 @@ const DATA = {
               <input class="field f-new" id="f-pub-new" name="publisherNew" placeholder="Название нового издателя" hidden />
             </div>
             <div class="f">
-              <label class="label" for="f-dev">Разработчик</label>
+              <label class="label" for="f-dev">Разработчик <span class="opt">необязательно</span></label>
               <input class="field" id="f-dev" name="developer" />
             </div>
           </div>
           <div class="f">
-            <span class="label">Жанры</span>
+            <span class="label">Жанры <span class="opt">необязательно</span></span>
             <div class="chips">
               {GENRES.map((g) => (
                 <label class="chip"><input type="checkbox" name="genres" value={g} />{g}</label>
@@ -105,19 +109,23 @@ const DATA = {
             </div>
           </div>
           <div class="f">
-            <span class="label">Обложка</span>
-            <div class="cover-in">
+            <span class="label">Обложка <span class="opt">необязательно</span></span>
+            <div class="cover-in" id="f-cover-drop">
               <div class="cover-in__pv" id="f-cover-pv"></div>
               <div>
                 <label class="btn btn--sm" for="f-cover"><Icon name="upload" />Выбрать картинку</label>
                 <input id="f-cover" name="cover" type="file" accept="image/*" class="sr-only" />
-                <p class="hint">JPG или PNG. Сайт сам уменьшит и сожмёт. Нет обложки — будет заглушка с иконкой консоли.</p>
+                <p class="hint">
+                  Или <b>перетащите</b> картинку сюда, или скопируйте её и нажмите <b>Ctrl+V</b> в любом месте анкеты.
+                  Сайт сам уменьшит и сожмёт. Нет обложки — будет заглушка с иконкой консоли.
+                </p>
+                <p class="hint ed__cover-err" id="f-cover-err" hidden></p>
                 <button type="button" class="link-btn" id="f-cover-clear" hidden>Убрать новую картинку</button>
               </div>
             </div>
           </div>
           <div class="f">
-            <label class="label" for="f-body">Описание игры</label>
+            <label class="label" for="f-body">Описание игры <span class="opt">необязательно</span></label>
             <textarea class="field f--tall" id="f-body" name="body" placeholder="Пара абзацев о сюжете и геймплее. Пустая строка — новый абзац. **Жирный**, *курсив*."></textarea>
           </div>
         </section>
@@ -183,7 +191,7 @@ const DATA = {
         </div>
 
         <div class="f">
-          <span class="label">Рекомендация</span>
+          <span class="label">Рекомендация <span class="opt">не выбрана — «Не проверено»</span></span>
           <div class="chips">
             {VERDICT_KEYS.map((k) => (
               <label class="chip chip--r chip--v">
@@ -196,11 +204,11 @@ const DATA = {
         </div>
         <div class="f2">
           <div class="f">
-            <label class="label">Своё название рекомендации</label>
+            <label class="label">Своё название рекомендации <span class="opt">необязательно</span></label>
             <input class="field" data-f="verdictLabel" placeholder="Например: Через боль" />
           </div>
           <div class="f">
-            <label class="label">Почему такая рекомендация</label>
+            <label class="label">Почему такая рекомендация <span class="opt">необязательно</span></label>
             <input class="field" data-f="verdictNote" placeholder="Одна-две фразы своими словами" />
           </div>
         </div>
@@ -213,13 +221,29 @@ const DATA = {
             ))}
             <label class="chip"><input type="checkbox" data-f="updating" /><Icon name={UPDATING.icon} />{UPDATING.label}</label>
           </div>
-          <div class="chips chips--gaps">
+        </div>
+
+        <div class="f">
+          <span class="label">Что не переведено <span class="opt">необязательно</span></span>
+          <div class="chips chips--gaps" data-gaps>
             {GAP_KEYS.map((k) => (
               <label class="chip chip--gap"><input type="checkbox" data-f="gaps" value={k} />{GAPS[k]}</label>
             ))}
+            {customGaps.map((g) => (
+              <label class="chip chip--gap"><input type="checkbox" data-f="gapsCustom" value={g} />{g}</label>
+            ))}
+            <button type="button" class="chip chip--add" data-gap-add>+ своя отметка</button>
           </div>
-          <input class="field" data-f="gapsCustom" placeholder="Свои отметки через запятую: часть интерфейса, надписи на картах…" />
-          <input class="field" data-f="statusNote" placeholder="Сноска: что именно не переведено или не так («не переведены главы 5–7»)" />
+          <div class="gap-new" data-gap-new hidden>
+            <input class="field" data-gap-input placeholder="Например: часть интерфейса" maxlength="40" />
+            <button type="button" class="btn btn--sm btn--ink" data-gap-save>Добавить</button>
+          </div>
+          <p class="hint">Новая отметка после сохранения карточки появится в этом списке у всех модераторов.</p>
+        </div>
+
+        <div class="f">
+          <label class="label">Сноска к состоянию <span class="opt">необязательно</span></label>
+          <input class="field" data-f="statusNote" placeholder="Что именно не так: «не переведены главы 5–7». На сайте — со звёздочкой" />
         </div>
 
         <div class="f">
@@ -229,6 +253,7 @@ const DATA = {
             {translators.map((t) => <label class="chip"><input type="checkbox" data-f="translators" value={t.id} />{t.name}</label>)}
           </div>
           <input class="field" data-f="translatorsNew" placeholder="Нет в списке? Впишите ник (несколько — через запятую)" />
+          <p class="hint">Новый переводчик после сохранения появится в списке у всех модераторов и получит свою страницу.</p>
         </div>
 
         <label class="check"><input type="checkbox" data-f="port" />Это порт — готовый перевод перенесён на другую версию игры</label>
@@ -241,35 +266,38 @@ const DATA = {
             <input class="field" data-f="portersNew" placeholder="Нет в списке? Впишите ник" />
           </div>
           <div class="f">
-            <label class="label">Ссылка на оригинальный перевод</label>
-            <input class="field" data-f="originalUrl" type="url" placeholder="https://… — необязательно" />
-          </div>
-        </div>
-
-        <div class="f2">
-          <div class="f">
-            <label class="label">Ссылка на ресурс переводчика</label>
-            <input class="field" data-f="sourceUrl" type="url" placeholder="https://… — главная кнопка «Скачать у переводчика»" />
-          </div>
-          <div class="f">
-            <label class="label">Ссылка на пост в Telegram</label>
-            <input class="field" data-f="download" type="url" placeholder="https://t.me/…" />
+            <label class="label">Ссылка на оригинальный перевод <span class="opt">необязательно</span></label>
+            <input class="field" data-f="originalUrl" type="url" placeholder="https://…" />
           </div>
         </div>
 
         <div class="f">
-          <label class="label">Модератор</label>
+          <p class="hint hint--req">Нужна хотя бы одна ссылка из двух:</p>
+          <div class="f2">
+            <div class="f">
+              <label class="label">Ссылка на ресурс переводчика</label>
+              <input class="field" data-f="sourceUrl" type="url" placeholder="https://… — главная кнопка «Скачать у переводчика»" />
+            </div>
+            <div class="f">
+              <label class="label">Ссылка на пост в Telegram</label>
+              <input class="field" data-f="download" type="url" placeholder="https://t.me/…" />
+            </div>
+          </div>
+        </div>
+
+        <div class="f">
+          <label class="label">Модератор <span class="opt">необязательно</span></label>
           <select class="field" data-f="moderator">
             <option value="">— не указан —</option>
             {moderators.map((m) => <option value={m.id}>{m.name}</option>)}
           </select>
         </div>
         <div class="f">
-          <label class="label">Комментарий модератора</label>
+          <label class="label">Комментарий модератора <span class="opt">необязательно</span></label>
           <textarea class="field f--short" data-f="moderatorNote" placeholder="Ваше мнение о переводе"></textarea>
         </div>
         <div class="f">
-          <label class="label">Комментарий переводчика</label>
+          <label class="label">Комментарий переводчика <span class="opt">необязательно</span></label>
           <textarea class="field f--short" data-f="translatorNote" placeholder="Если переводчик что-то просил передать"></textarea>
         </div>
         <input type="hidden" data-f="date" />
@@ -328,7 +356,27 @@ const DATA = {
       ($('[data-del]', el) as HTMLButtonElement).hidden = $$('.etr', trs).length < 2;
     });
   }
+  // Своя отметка «что не переведено»: фишка добавляется во все переводы и в шаблон новых
+  function ensureGapChip(name: string) {
+    name = name.trim();
+    if (!name) return;
+    const lists = [...$$('[data-gaps]', trs), $('[data-gaps]', tpl.content)];
+    for (const box of lists) {
+      if ($$<HTMLInputElement>('input[data-f=gapsCustom]', box).some((i) => i.value.toLowerCase() === name.toLowerCase())) continue;
+      // копируем готовую фишку, чтобы у новой были те же стили
+      const lab = $('label.chip--gap', box).cloneNode(true) as HTMLLabelElement;
+      const cb = $<HTMLInputElement>('input', lab);
+      cb.dataset.f = 'gapsCustom';
+      cb.value = name;
+      cb.checked = false;
+      lab.replaceChildren(cb, document.createTextNode(name));
+      box.insertBefore(lab, $('[data-gap-add]', box));
+    }
+  }
   function fillTranslation(el: HTMLElement, t: Tr) {
+    // старые черновики хранили отметки строкой через запятую
+    if (typeof t.gapsCustom === 'string') t = { ...t, gapsCustom: splitNames(t.gapsCustom) };
+    for (const g of t.gapsCustom ?? []) ensureGapChip(g);
     for (const inp of $$<HTMLInputElement>('[data-f]', el)) {
       const f = inp.dataset.f!;
       const v = t[f];
@@ -399,7 +447,7 @@ const DATA = {
     if (t.updating) h += `<span class="status status--upd">${icon('ui', D.updating.icon)}${D.updating.label}</span>`;
     if (withGaps) {
       for (const g of t.gaps || []) h += `<span class="gap">${esc(D.gaps[g])}</span>`;
-      for (const g of splitNames(t.gapsCustom || '')) h += `<span class="gap">${esc(g)}</span>`;
+      for (const g of t.gapsCustom || []) h += `<span class="gap">${esc(g)}</span>`;
     }
     return h;
   }
@@ -619,6 +667,68 @@ const DATA = {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (file) openCrop(file);
   });
+
+  // ── Вставка из буфера (Ctrl+V) и перетаскивание картинки ──
+  const coverErr = $('#f-cover-err');
+  const dropZone = $('#f-cover-drop');
+  function coverProblem(text: string) {
+    coverErr.textContent = text;
+    coverErr.hidden = !text;
+  }
+  function takeImage(file: File | null | undefined) {
+    if (!file) return false;
+    if (!file.type.startsWith('image/')) {
+      coverProblem('Это не картинка. Подойдут JPG, PNG, WEBP.');
+      return true;
+    }
+    coverProblem('');
+    $('#f-cover-drop').scrollIntoView({ block: 'center' });
+    openCrop(file);
+    return true;
+  }
+  document.addEventListener('paste', (e) => {
+    if (crop.open) return;
+    const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+    if (file) {
+      e.preventDefault();
+      takeImage(file);
+    }
+  });
+  // перетаскивать можно на всю страницу редактора — браузер не будет открывать картинку вместо сайта
+  let dragDepth = 0;
+  const hasFiles = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].some((t) => t === 'Files' || t === 'text/uri-list');
+  addEventListener('dragenter', (e) => {
+    if (!hasFiles(e)) return;
+    dragDepth++;
+    dropZone.classList.add('is-drop');
+  });
+  addEventListener('dragleave', () => {
+    if (--dragDepth <= 0) {
+      dragDepth = 0;
+      dropZone.classList.remove('is-drop');
+    }
+  });
+  addEventListener('dragover', (e) => {
+    if (hasFiles(e)) e.preventDefault();
+  });
+  addEventListener('drop', async (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    dragDepth = 0;
+    dropZone.classList.remove('is-drop');
+    if (takeImage(e.dataTransfer!.files[0])) return;
+    // картинку тащат прямо с другого сайта — пробуем скачать по ссылке
+    const url = (e.dataTransfer!.getData('text/uri-list') || e.dataTransfer!.getData('text/plain')).split('\n')[0].trim();
+    if (!/^https?:\/\//i.test(url)) return;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      if (!blob.type.startsWith('image/')) throw new Error();
+      takeImage(new File([blob], 'cover', { type: blob.type }));
+    } catch {
+      coverProblem('Этот сайт не даёт забрать картинку напрямую. Нажмите на картинке правой кнопкой → «Копировать изображение», потом Ctrl+V здесь.');
+    }
+  });
   $('#f-cover-clear').addEventListener('click', () => {
     if (newCover) URL.revokeObjectURL(newCover.url);
     newCover = null;
@@ -664,7 +774,7 @@ const DATA = {
         status: t.status && t.status !== 'full' ? t.status : '',
         updating: t.updating,
         gaps: t.gaps,
-        gapsCustom: splitNames(t.gapsCustom ?? ''),
+        gapsCustom: t.gapsCustom ?? [],
         statusNote: t.statusNote,
         translators: [...new Set(people(t.translators ?? [], t.translatorsNew))],
         port: t.port,
@@ -843,6 +953,36 @@ const DATA = {
     if (t.name === 'publisher') ($('#f-pub-new') as HTMLElement).hidden = t.value !== '__new';
     changed();
   });
+  function saveGap(etr: HTMLElement) {
+    const inp = $<HTMLInputElement>('[data-gap-input]', etr);
+    const name = inp.value.trim();
+    if (!name) return;
+    ensureGapChip(name);
+    const box = $('[data-gaps]', etr);
+    const cb = $$<HTMLInputElement>('input[data-f=gapsCustom]', box).find((i) => i.value.toLowerCase() === name.toLowerCase());
+    if (cb) cb.checked = true;
+    inp.value = '';
+    ($('[data-gap-new]', etr) as HTMLElement).hidden = true;
+    changed();
+  }
+  trs.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const etr = t.closest<HTMLElement>('.etr');
+    if (etr && t.closest('[data-gap-add]')) {
+      const box = $('[data-gap-new]', etr) as HTMLElement;
+      box.hidden = false;
+      $<HTMLInputElement>('[data-gap-input]', etr).focus();
+      return;
+    }
+    if (etr && t.closest('[data-gap-save]')) return saveGap(etr);
+  });
+  trs.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.matches('[data-gap-input]') && e.key === 'Enter') {
+      e.preventDefault();
+      saveGap(t.closest('.etr')!);
+    }
+  });
   trs.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('[data-del]');
     if (b && confirm('Удалить этот перевод из карточки?')) {
@@ -978,6 +1118,35 @@ const DATA = {
     font-size: 0.85rem;
     color: var(--ink-2);
   }
+  .hint--req {
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .opt {
+    margin-left: 0.4em;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink-2);
+    opacity: 0.85;
+  }
+  .opt::before {
+    content: '· ';
+  }
+  .chip--add {
+    font: 700 0.82rem var(--f-mono);
+    border-style: dashed;
+    background: transparent;
+  }
+  .gap-new {
+    display: flex;
+    gap: 8px;
+    max-width: 420px;
+  }
+  .gap-new .field {
+    padding: 0.45em 0.6em;
+    font-size: 0.9rem;
+  }
   .link-btn {
     padding: 0;
     font: 600 0.85rem var(--f-body);
@@ -1094,6 +1263,21 @@ const DATA = {
     display: flex;
     gap: 14px;
     align-items: flex-start;
+  }
+  .cover-in {
+    padding: 6px;
+    margin: -6px;
+    border: var(--bw-thin) dashed transparent;
+    border-radius: var(--r-card);
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .cover-in.is-drop {
+    border-color: var(--line);
+    background: color-mix(in srgb, var(--teal) 22%, transparent);
+  }
+  .ed__cover-err {
+    color: var(--red);
+    font-weight: 600;
   }
   .cover-in__pv {
     flex: none;
