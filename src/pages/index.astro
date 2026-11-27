@@ -33,7 +33,7 @@ const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.
       <p class="hero__lead">Архив русских переводов ретро-игр.</p>
       <form class="hero__search" action={u('/search/')} method="get" role="search">
         <label for="hero-q" class="sr-only">Название игры</label>
-        <input id="hero-q" class="field" type="search" name="q" placeholder="Например: Snatcher или «снатчер»" autocomplete="off" />
+        <input id="hero-q" class="field" type="search" name="q" placeholder="Название игры — можно с опечатками" autocomplete="off" />
         <button class="btn btn--primary" type="submit"><Icon name="search" />Найти</button>
       </form>
       <div class="hero__types">
