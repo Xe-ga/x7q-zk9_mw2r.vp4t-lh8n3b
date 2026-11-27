@@ -69,29 +69,29 @@ const DATA = {
         <section class="ed__sec panel">
           <h2 class="ed__h">Игра</h2>
           <div class="f">
-            <label class="label" for="f-title">Название *</label>
+            <label class="label" for="f-title">Название</label>
             <input class="field" id="f-title" name="title" required placeholder="Как на коробке или в английской версии" />
           </div>
           <div class="f">
-            <label class="label" for="f-alt">Другие названия <span class="opt">необязательно</span></label>
+            <label class="label" for="f-alt">Другие названия</label>
             <textarea class="field f--short" id="f-alt" name="altTitles" placeholder="По одному в строке: японское, европейское… По ним тоже ищут"></textarea>
           </div>
           <div class="f2">
             <div class="f">
-              <label class="label" for="f-platform">Платформа *</label>
+              <label class="label" for="f-platform">Платформа</label>
               <select class="field" id="f-platform" name="platform" required>
                 <option value="">— выберите —</option>
                 {PLATFORMS.map((p) => <option value={p.slug}>{p.name}</option>)}
               </select>
             </div>
             <div class="f">
-              <label class="label" for="f-year">Год выхода <span class="opt">необязательно</span></label>
+              <label class="label" for="f-year">Год выхода</label>
               <input class="field" id="f-year" name="year" type="number" min="1970" max="2100" inputmode="numeric" />
             </div>
           </div>
           <div class="f2">
             <div class="f">
-              <label class="label" for="f-pub">Издатель <span class="opt">необязательно</span></label>
+              <label class="label" for="f-pub">Издатель</label>
               <select class="field" id="f-pub" name="publisher">
                 <option value="">— не указан —</option>
                 {publishers.map((p) => <option value={p.id}>{p.name}</option>)}
@@ -100,12 +100,12 @@ const DATA = {
               <input class="field f-new" id="f-pub-new" name="publisherNew" placeholder="Название нового издателя" hidden />
             </div>
             <div class="f">
-              <label class="label" for="f-dev">Разработчик <span class="opt">необязательно</span></label>
+              <label class="label" for="f-dev">Разработчик</label>
               <input class="field" id="f-dev" name="developer" />
             </div>
           </div>
           <div class="f">
-            <span class="label">Жанры <span class="opt">необязательно</span></span>
+            <span class="label">Жанры</span>
             <div class="chips" id="f-genres">
               {[...GENRES, ...customGenres].map((g) => (
                 <label class="chip"><input type="checkbox" name="genres" value={g} />{g}</label>
@@ -119,7 +119,7 @@ const DATA = {
             <p class="hint">Новый жанр после сохранения карточки появится в этом списке у всех модераторов и в фильтрах каталога.</p>
           </div>
           <div class="f">
-            <span class="label">Обложка <span class="opt">необязательно</span></span>
+            <span class="label">Обложка</span>
             <div class="cover-in" id="f-cover-drop">
               <div class="cover-in__pv" id="f-cover-pv"></div>
               <div>
@@ -135,7 +135,7 @@ const DATA = {
             </div>
           </div>
           <div class="f">
-            <label class="label" for="f-body">Описание игры <span class="opt">необязательно</span></label>
+            <label class="label" for="f-body">Описание игры</label>
             <textarea class="field f--tall" id="f-body" name="body" placeholder="Пара абзацев о сюжете и геймплее. Пустая строка — новый абзац. **Жирный**, *курсив*."></textarea>
           </div>
         </section>
@@ -192,7 +192,7 @@ const DATA = {
         </div>
 
         <div class="f">
-          <span class="label">Тип перевода *</span>
+          <span class="label">Тип перевода</span>
           <div class="chips">
             {TRANSLATION_TYPE_KEYS.map((k) => (
               <label class={`chip chip--r tag--${k}`}><input type="radio" data-f="type" value={k} />{TRANSLATION_TYPES[k].label}</label>
@@ -201,7 +201,7 @@ const DATA = {
         </div>
 
         <div class="f">
-          <span class="label">Рекомендация <span class="opt">не выбрана — «Не проверено»</span></span>
+          <span class="label">Рекомендация</span>
           <div class="chips">
             {VERDICT_KEYS.map((k) => (
               <label class="chip chip--r chip--v">
@@ -214,11 +214,11 @@ const DATA = {
         </div>
         <div class="f2">
           <div class="f">
-            <label class="label">Своё название рекомендации <span class="opt">необязательно</span></label>
+            <label class="label">Своё название рекомендации<span class="optstar" tabindex="0" data-tip="Необязательно — можно оставить пустым">*</span></label>
             <input class="field" data-f="verdictLabel" placeholder="Например: Через боль" />
           </div>
           <div class="f">
-            <label class="label">Почему такая рекомендация <span class="opt">необязательно</span></label>
+            <label class="label">Почему такая рекомендация<span class="optstar" tabindex="0" data-tip="Необязательно — можно оставить пустым">*</span></label>
             <input class="field" data-f="verdictNote" placeholder="Одна-две фразы своими словами" />
           </div>
         </div>
@@ -234,7 +234,7 @@ const DATA = {
         </div>
 
         <div class="f">
-          <span class="label">Что не переведено <span class="opt">необязательно</span></span>
+          <span class="label">Что не переведено</span>
           <div class="chips chips--gaps" data-gaps>
             {GAP_KEYS.map((k) => (
               <label class="chip chip--gap"><input type="checkbox" data-f="gaps" value={k} />{GAPS[k]}</label>
@@ -252,7 +252,7 @@ const DATA = {
         </div>
 
         <div class="f">
-          <label class="label">Сноска к состоянию <span class="opt">необязательно</span></label>
+          <label class="label">Сноска к состоянию</label>
           <input class="field" data-f="statusNote" placeholder="Что именно не так: «не переведены главы 5–7». На сайте — со звёздочкой" />
         </div>
 
@@ -276,7 +276,7 @@ const DATA = {
             <input class="field" data-f="portersNew" placeholder="Нет в списке? Впишите ник" />
           </div>
           <div class="f">
-            <label class="label">Ссылка на оригинальный перевод <span class="opt">необязательно</span></label>
+            <label class="label">Ссылка на оригинальный перевод</label>
             <input class="field" data-f="originalUrl" type="url" placeholder="https://…" />
           </div>
         </div>
@@ -296,18 +296,18 @@ const DATA = {
         </div>
 
         <div class="f">
-          <label class="label">Модератор <span class="opt">необязательно</span></label>
+          <label class="label">Модератор</label>
           <select class="field" data-f="moderator">
             <option value="">— не указан —</option>
             {moderators.map((m) => <option value={m.id}>{m.name}</option>)}
           </select>
         </div>
         <div class="f">
-          <label class="label">Комментарий модератора <span class="opt">необязательно</span></label>
+          <label class="label">Комментарий модератора</label>
           <textarea class="field f--short" data-f="moderatorNote" placeholder="Ваше мнение о переводе"></textarea>
         </div>
         <div class="f">
-          <label class="label">Комментарий переводчика <span class="opt">необязательно</span></label>
+          <label class="label">Комментарий переводчика</label>
           <textarea class="field f--short" data-f="translatorNote" placeholder="Если переводчик что-то просил передать"></textarea>
         </div>
         <input type="hidden" data-f="date" />
@@ -1169,16 +1169,35 @@ const DATA = {
     font-weight: 600;
     color: var(--ink);
   }
-  .opt {
-    margin-left: 0.4em;
-    font-weight: 500;
+  .optstar {
+    position: relative;
+    margin-left: 0.25em;
+    color: var(--teal);
+    font-weight: 800;
+    cursor: help;
+  }
+  .optstar::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+    z-index: 5;
+    padding: 0.4em 0.6em;
+    white-space: nowrap;
+    font: 600 0.75rem/1.2 var(--f-body);
     text-transform: none;
     letter-spacing: 0;
-    color: var(--ink-2);
-    opacity: 0.85;
+    color: #f2ede1;
+    background: #15130f;
+    border-radius: var(--r-tag);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s;
   }
-  .opt::before {
-    content: '· ';
+  .optstar:hover::after,
+  .optstar:focus-visible::after {
+    opacity: 1;
   }
   .chip--add {
     font: 700 0.82rem var(--f-mono);

@@ -1,58 +1,112 @@
 ---
-// Узоры по краям широкого экрана: растровые точки, зигзаги, звёзды, кольца — в стиле наклеек.
+// Узоры по краям широкого экрана: растровые точки, стилизованные картриджи и консоли — как наклейки.
 // Видны только там, где по бокам есть пустое место (от ~1400px), и уходят под подвал.
+import { u } from '../lib/util';
+
 const dots = (x0: number, y0: number, cols: number, rows: number, step = 12, r = 2.2) =>
   Array.from({ length: cols * rows }, (_, i) => ({ cx: x0 + (i % cols) * step, cy: y0 + Math.floor(i / cols) * step, r }));
-const star = (cx: number, cy: number, R: number, r: number) => {
-  const pts: string[] = [];
-  for (let i = 0; i < 8; i++) {
-    const a = (Math.PI / 4) * i - Math.PI / 2;
-    const rr = i % 2 ? r : R;
-    pts.push(`${(cx + rr * Math.cos(a)).toFixed(1)},${(cy + rr * Math.sin(a)).toFixed(1)}`);
-  }
-  return pts.join(' ');
-};
-const zig = (x: number, y: number, n: number, w: number, h: number) =>
-  Array.from({ length: n + 1 }, (_, i) => `${x + i * w},${y + (i % 2 ? h : 0)}`).join(' ');
+const icon = (slug: string) => u(`/icons/platforms/${slug}.svg`);
 ---
 <div class="decor decor--l" aria-hidden="true">
   <svg viewBox="0 0 140 900" preserveAspectRatio="xMidYMin meet">
+    <defs>
+      <mask id="dl-n64" maskUnits="userSpaceOnUse" x="0" y="0" width="140" height="900">
+        <image href={icon('n64')} x="14" y="520" width="112" height="112" />
+      </mask>
+    </defs>
+
     <g class="d-dots">{dots(14, 20, 9, 7).map((d) => <circle {...d} />)}</g>
-    <g transform="translate(4 4)"><polyline class="d-shadow d-zig" points={zig(20, 150, 6, 17, 22)} /></g>
-    <polyline class="d-zig d-zig--teal" points={zig(20, 150, 6, 17, 22)} />
-    <polygon class="d-shadow" points={star(74, 290, 46, 12)} transform="translate(5 5)" />
-    <polygon class="d-shape d-yellow" points={star(74, 290, 46, 12)} />
-    <circle class="d-shadow d-ring-sh" cx="79" cy="445" r="34" />
-    <circle class="d-ring" cx="74" cy="440" r="34" />
-    <g class="d-chev">
-      <polyline points="30,560 56,586 30,612" />
-      <polyline points="62,560 88,586 62,612" />
-      <polyline points="94,560 120,586 94,612" />
+
+    <!-- картридж NES -->
+    <g transform="translate(22 128) rotate(-8 46 39)">
+      <rect class="d-sh" x="4" y="4" width="92" height="78" rx="3" />
+      <rect class="d-o d-grey" width="92" height="78" rx="3" />
+      <rect class="d-o d-orange" x="9" y="8" width="74" height="42" rx="2" />
+      <rect class="d-ink" x="15" y="14" width="44" height="7" />
+      <rect class="d-ink d-soft" x="15" y="26" width="30" height="4" />
+      <rect class="d-ink d-soft" x="15" y="34" width="38" height="4" />
+      <g class="d-ridge">{[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => <line x1={12 + i * 8.5} y1="58" x2={12 + i * 8.5} y2="72" />)}</g>
     </g>
-    <g class="d-dots d-dots--sparse">{dots(18, 680, 5, 5, 22, 3).map((d) => <circle {...d} />)}</g>
-    <rect class="d-shadow" x="34" y="820" width="70" height="40" rx="4" transform="translate(5 5)" />
-    <rect class="d-shape d-orange" x="34" y="820" width="70" height="40" rx="4" />
+
+    <!-- Game Boy -->
+    <g transform="translate(36 262) rotate(6 37 60)">
+      <path class="d-sh" d="M4 4 H74 Q78 4 78 8 V100 Q78 124 54 124 H8 Q4 124 4 120 Z" />
+      <path class="d-o d-light" d="M0 4 Q0 0 4 0 H70 Q74 0 74 4 V96 Q74 120 50 120 H4 Q0 120 0 116 Z" />
+      <rect class="d-o d-bezel" x="8" y="9" width="58" height="46" rx="4" />
+      <rect class="d-screen" x="18" y="16" width="38" height="32" />
+      <rect class="d-ink" x="10" y="72" width="22" height="7" />
+      <rect class="d-ink" x="17.5" y="64.5" width="7" height="22" />
+      <circle class="d-o d-magenta" cx="58" cy="70" r="6" />
+      <circle class="d-o d-magenta" cx="46" cy="78" r="6" />
+      <rect class="d-ink d-soft" x="24" y="96" width="10" height="4" rx="2" transform="rotate(-25 29 98)" />
+      <rect class="d-ink d-soft" x="38" y="96" width="10" height="4" rx="2" transform="rotate(-25 43 98)" />
+    </g>
+
+    <g class="d-dots d-dots--sparse">{dots(18, 418, 5, 4, 22, 3).map((d) => <circle {...d} />)}</g>
+
+    <!-- геймпад N64 — силуэт из набора иконок -->
+    <g transform="translate(5 5)"><rect class="d-sh" width="140" height="900" mask="url(#dl-n64)" /></g>
+    <rect class="d-yellow" width="140" height="900" mask="url(#dl-n64)" />
+
+    <!-- картридж Game Boy -->
+    <g transform="translate(40 668) rotate(-10 32 36)">
+      <polygon class="d-sh" points="4,4 58,4 68,14 68,76 4,76" />
+      <polygon class="d-o d-grey" points="0,0 54,0 64,10 64,72 0,72" />
+      <polygon class="d-ink" points="27,5 37,5 32,10" />
+      <rect class="d-o d-teal" x="8" y="16" width="48" height="42" rx="2" />
+      <rect class="d-ink" x="14" y="22" width="26" height="6" />
+      <rect class="d-ink d-soft" x="14" y="33" width="34" height="4" />
+    </g>
+
+    <g class="d-dots">{dots(20, 790, 9, 6).map((d) => <circle {...d} />)}</g>
   </svg>
 </div>
+
 <div class="decor decor--r" aria-hidden="true">
   <svg viewBox="0 0 140 900" preserveAspectRatio="xMidYMin meet">
-    <circle class="d-shadow" cx="75" cy="75" r="40" />
-    <circle class="d-shape d-magenta" cx="70" cy="70" r="40" />
-    <circle class="d-hole" cx="70" cy="70" r="14" />
-    <g class="d-dots">{dots(20, 160, 9, 9, 12, 2.2).map((d) => <circle {...d} />)}</g>
-    <polygon class="d-shadow" points={star(70, 340, 30, 8)} transform="translate(4 4)" />
-    <polygon class="d-shape d-teal" points={star(70, 340, 30, 8)} />
-    <g transform="translate(4 4)"><polyline class="d-shadow d-zig" points={zig(16, 430, 6, 18, 20)} /></g>
-    <polyline class="d-zig d-zig--yellow" points={zig(16, 430, 6, 18, 20)} />
-    <path class="d-shadow" d="M30 620 A 44 44 0 0 1 118 620 Z" transform="translate(5 5)" />
-    <path class="d-shape d-green" d="M30 620 A 44 44 0 0 1 118 620 Z" />
-    <g class="d-plus">
-      <path d="M40 700 v24 M28 712 h24" />
-      <path d="M96 740 v24 M84 752 h24" />
-      <path d="M52 790 v24 M40 802 h24" />
+    <defs>
+      <mask id="dr-nes" maskUnits="userSpaceOnUse" x="0" y="0" width="140" height="900">
+        <image href={icon('nes')} x="10" y="250" width="120" height="120" />
+      </mask>
+      <mask id="dr-ps1" maskUnits="userSpaceOnUse" x="0" y="0" width="140" height="900">
+        <image href={icon('ps1')} x="16" y="586" width="108" height="108" />
+      </mask>
+    </defs>
+
+    <!-- картридж Mega Drive -->
+    <g transform="translate(30 22) rotate(7 40 48)">
+      <rect class="d-sh" x="4" y="4" width="80" height="96" rx="4" />
+      <rect class="d-o d-dark" width="80" height="96" rx="4" />
+      <rect class="d-o d-yellow" x="10" y="12" width="60" height="50" rx="2" />
+      <rect class="d-ink" x="16" y="18" width="34" height="7" />
+      <rect class="d-ink d-soft" x="16" y="30" width="44" height="4" />
+      <rect class="d-ink d-soft" x="16" y="38" width="26" height="4" />
+      <g class="d-ridge d-ridge--light">{[0, 1, 2, 3, 4, 5].map((i) => <line x1={16 + i * 9.5} y1="72" x2={16 + i * 9.5} y2="88" />)}</g>
     </g>
-    <polygon class="d-shadow" points={star(92, 860, 22, 6)} transform="translate(4 4)" />
-    <polygon class="d-shape d-yellow" points={star(92, 860, 22, 6)} />
+
+    <g class="d-dots">{dots(20, 150, 9, 7).map((d) => <circle {...d} />)}</g>
+
+    <!-- консоль NES — силуэт из набора иконок -->
+    <g transform="translate(5 5)"><rect class="d-sh" width="140" height="900" mask="url(#dr-nes)" /></g>
+    <rect class="d-teal" width="140" height="900" mask="url(#dr-nes)" />
+
+    <!-- картридж SNES / Super Famicom -->
+    <g transform="translate(18 428) rotate(-6 50 36)">
+      <rect class="d-sh" x="4" y="4" width="100" height="72" rx="10" />
+      <rect class="d-o d-grey" width="100" height="72" rx="10" />
+      <rect class="d-groove" x="7" y="12" width="6" height="48" rx="3" />
+      <rect class="d-groove" x="87" y="12" width="6" height="48" rx="3" />
+      <rect class="d-o d-magenta" x="19" y="9" width="62" height="44" rx="2" />
+      <rect class="d-stripe1" x="19" y="40" width="62" height="5" />
+      <rect class="d-stripe2" x="19" y="45" width="62" height="5" />
+      <rect class="d-ink" x="25" y="15" width="36" height="7" />
+    </g>
+
+    <!-- геймпад PlayStation — силуэт -->
+    <g transform="translate(5 5)"><rect class="d-sh" width="140" height="900" mask="url(#dr-ps1)" /></g>
+    <rect class="d-orange" width="140" height="900" mask="url(#dr-ps1)" />
+
+    <g class="d-dots d-dots--sparse">{dots(18, 730, 5, 7, 22, 3).map((d) => <circle {...d} />)}</g>
   </svg>
 </div>
 
@@ -89,14 +143,53 @@ const zig = (x: number, y: number, n: number, w: number, h: number) =>
   .decor :global(.d-dots--sparse) {
     opacity: 0.3;
   }
-  .decor :global(.d-shadow) {
+  /* «наклейка»: жёсткая тень и толстая обводка */
+  .decor :global(.d-sh) {
     fill: #15130f;
-    stroke: #15130f;
   }
-  .decor :global(.d-shape) {
+  .decor :global(.d-o) {
     stroke: #15130f;
     stroke-width: 3;
     stroke-linejoin: round;
+  }
+  .decor :global(.d-ink) {
+    fill: #15130f;
+  }
+  .decor :global(.d-soft) {
+    opacity: 0.55;
+  }
+  .decor :global(.d-grey) {
+    fill: #c9c3b5;
+  }
+  .decor :global(.d-light) {
+    fill: #e2ddd0;
+  }
+  .decor :global(.d-dark) {
+    fill: #2d2a25;
+  }
+  .decor :global(.d-bezel) {
+    fill: #55504a;
+  }
+  .decor :global(.d-screen) {
+    fill: #9cb23a;
+  }
+  .decor :global(.d-groove) {
+    fill: #a39d8f;
+  }
+  .decor :global(.d-stripe1) {
+    fill: var(--yellow);
+  }
+  .decor :global(.d-stripe2) {
+    fill: var(--teal);
+  }
+  .decor :global(.d-ridge) {
+    stroke: #15130f;
+    stroke-width: 2.5;
+    opacity: 0.5;
+  }
+  .decor :global(.d-ridge--light) {
+    stroke: #c9c3b5;
+    opacity: 0.6;
   }
   .decor :global(.d-yellow) {
     fill: var(--yellow);
@@ -109,47 +202,5 @@ const zig = (x: number, y: number, n: number, w: number, h: number) =>
   }
   .decor :global(.d-orange) {
     fill: var(--orange);
-  }
-  .decor :global(.d-green) {
-    fill: var(--green);
-  }
-  .decor :global(.d-hole) {
-    fill: var(--paper);
-    stroke: #15130f;
-    stroke-width: 3;
-  }
-  .decor :global(.d-zig) {
-    fill: none;
-    stroke-width: 9;
-    stroke-linecap: square;
-    stroke-linejoin: miter;
-  }
-  .decor :global(.d-zig--teal) {
-    stroke: var(--teal);
-  }
-  .decor :global(.d-zig--yellow) {
-    stroke: var(--yellow);
-  }
-  .decor :global(.d-ring) {
-    fill: none;
-    stroke: var(--magenta);
-    stroke-width: 10;
-  }
-  .decor :global(.d-ring-sh) {
-    fill: none;
-    stroke-width: 10;
-  }
-  .decor :global(.d-chev) {
-    fill: none;
-    stroke: var(--ink);
-    stroke-width: 7;
-    stroke-linecap: square;
-    opacity: 0.75;
-  }
-  .decor :global(.d-plus) {
-    fill: none;
-    stroke: var(--teal);
-    stroke-width: 7;
-    stroke-linecap: square;
   }
 </style>
