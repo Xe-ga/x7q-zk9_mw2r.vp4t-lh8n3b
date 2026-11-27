@@ -89,7 +89,9 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
     const j = await res.json().catch(() => ({}));
     throw new Error(String(j.message || 'NETWORK').replace(/^.*?(LINKS|RATE|EMPTY|LONG|DENIED|LINK).*$/s, '$1'));
   }
-  return res.json();
+  // действия вроде «принять заявку» или «удалить комментарий» успешны, но ничего не возвращают (пустой ответ)
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 // ---------- Демо (только этот браузер) ----------
