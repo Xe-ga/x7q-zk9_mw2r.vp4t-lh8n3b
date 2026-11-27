@@ -1,0 +1,131 @@
+---
+import Base from '../layouts/Base.astro';
+import TypeTag from '../components/TypeTag.astro';
+import VerdictTag from '../components/VerdictTag.astro';
+import { TRANSLATION_TYPES, TRANSLATION_TYPE_KEYS, VERDICTS, VERDICT_KEYS, STATUSES, STATUS_KEYS } from '../data/taxonomy';
+import StatusTag from '../components/StatusTag.astro';
+import { SITE } from '../config';
+---
+<Base title="О проекте" description="Что такое РУСПАТЧ, как скачивать переводы и что означают метки.">
+  <article class="wrap about">
+    <h1>О проекте</h1>
+    <div class="about__grid">
+      <div class="prose">
+        <p class="about__lead">
+          {SITE.name} — каталог русских переводов старых игр. Сами файлы лежат в Telegram-канале, а здесь у каждой
+          игры есть своя страница: описание, кто переводил, насколько хорош перевод и что о нём думают игроки.
+        </p>
+
+        <h2>Как скачать</h2>
+        <ol>
+          <li>Найдите игру через <a href="../search/">каталог</a> или поиск в шапке.</li>
+          <li>Нажмите «Скачать» — откроется пост в Telegram с файлом.</li>
+          <li>Как правило, это патч: его нужно применить к оригинальному образу игры. Инструкция — в самом посте.</li>
+        </ol>
+
+        <h2>Оценки и комментарии</h2>
+        <p>
+          Регистрироваться не нужно. С одного браузера можно поставить одну оценку игре и один плюс или минус каждому комментарию —
+          голос можно поменять. Комментарии со ссылками не публикуются: так мы защищаемся от рекламы.
+        </p>
+
+        <h2 id="rights">Правообладателям</h2>
+        <p>
+          Сайт не хранит игры и файлы — только описания и ссылки. Если вы правообладатель и считаете, что материал нарушает ваши права,
+          напишите нам в <a href={SITE.telegram} rel="noopener">Telegram</a> — разберёмся и уберём.
+        </p>
+
+        <h2 id="credits">Благодарности</h2>
+        <ul>
+          <li>Иконки платформ — <a href="https://github.com/libretro/retroarch-assets" rel="noopener">libretro / RetroArch</a>, лицензия CC BY 4.0.</li>
+          <li>Иконки интерфейса — <a href="https://github.com/hackernoon/pixel-icon-library" rel="noopener">HackerNoon Pixel Icon Library</a> (MIT) и <a href="https://github.com/halfmage/pixelarticons" rel="noopener">Pixelarticons</a> (MIT).</li>
+          <li>Шрифты — Unbounded, Golos Text и JetBrains Mono (SIL Open Font License).</li>
+        </ul>
+      </div>
+
+      <aside class="legend panel" aria-labelledby="legend-h">
+        <h2 id="legend-h" class="label">Тип перевода</h2>
+        <dl>
+          {TRANSLATION_TYPE_KEYS.map((t) => (
+            <div class="legend__row">
+              <dt><TypeTag type={t} big link /></dt>
+              <dd>{TRANSLATION_TYPES[t].hint}.</dd>
+            </div>
+          ))}
+        </dl>
+        <h2 class="label legend__h2">Рекомендация</h2>
+        <dl>
+          {VERDICT_KEYS.map((v) => (
+            <div class="legend__row">
+              <dt><VerdictTag verdict={v} big link /></dt>
+              <dd>{VERDICTS[v].hint}.</dd>
+            </div>
+          ))}
+        </dl>
+        <h2 class="label legend__h2">Состояние</h2>
+        <dl>
+          {STATUS_KEYS.map((s) => (
+            <div class="legend__row">
+              <dt><StatusTag status={s} big link /></dt>
+              <dd>{STATUSES[s].hint}.</dd>
+            </div>
+          ))}
+        </dl>
+        <p class="muted legend__note">Тип говорит, <b>как</b> сделан перевод, рекомендация — <b>насколько с ним приятно играть</b>. Обе метки ставит модератор. Не согласны — напишите в комментариях к игре.</p>
+      </aside>
+    </div>
+  </article>
+</Base>
+<style>
+  .about {
+    padding-top: clamp(28px, 4vw, 52px);
+  }
+  .about__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: clamp(28px, 5vw, 72px);
+    align-items: start;
+    margin-top: 1.5rem;
+  }
+  .about__grid .prose {
+    overflow-wrap: anywhere;
+  }
+  .about__lead {
+    font-size: var(--s1);
+    line-height: 1.45;
+  }
+  .legend {
+    padding: 1.3rem;
+    position: sticky;
+    top: 92px;
+  }
+  .legend h2 {
+    margin-bottom: 1rem;
+    font-size: var(--s-1);
+  }
+  .legend dl {
+    margin: 0;
+  }
+  .legend__h2 {
+    margin-top: 1.6rem;
+  }
+  .legend__row {
+    padding: 0.8rem 0;
+    border-bottom: var(--bw-thin) dashed var(--ink-2);
+  }
+  .legend dd {
+    margin: 0.5rem 0 0;
+  }
+  .legend__note {
+    font-size: 0.88rem;
+    margin: 1rem 0 0;
+  }
+  @media (max-width: 860px) {
+    .about__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .legend {
+      position: static;
+    }
+  }
+</style>

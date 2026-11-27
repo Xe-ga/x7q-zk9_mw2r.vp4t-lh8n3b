@@ -1,0 +1,20 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import { PLATFORM_BY_SLUG } from '../data/platforms';
+import Icon from './Icon.astro';
+interface Props { cover?: ImageMetadata | null; title: string; platform: string; widths?: number[]; sizes?: string; eager?: boolean }
+const { cover, title, platform, widths = [240, 360, 480], sizes = '(max-width: 600px) 50vw, 260px', eager = false } = Astro.props;
+const FALLBACK = ['var(--teal)', 'var(--yellow)', 'var(--magenta)', 'var(--orange)', 'var(--sky)', 'var(--green)'];
+const idx = [...platform].reduce((a, c) => a + c.charCodeAt(0), 0) % FALLBACK.length;
+const p = PLATFORM_BY_SLUG[platform];
+---
+{cover ? (
+  <Image src={cover} alt={`Обложка: ${title}`} widths={widths} sizes={sizes} loading={eager ? 'eager' : 'lazy'} class="cover-img" />
+) : (
+  <div class="cover-fallback" style={`--fb:${FALLBACK[idx]}`} role="img" aria-label={`Нет обложки: ${title}`}>
+    <Icon name={platform} platform class="cover-fallback__ico" />
+    <span class="cover-fallback__title">{title}</span>
+    <span class="cover-fallback__plat label">{p?.short}</span>
+  </div>
+)}

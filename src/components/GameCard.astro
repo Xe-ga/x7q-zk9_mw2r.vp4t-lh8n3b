@@ -1,0 +1,35 @@
+---
+import type { Game } from '../lib/util';
+import { u, rankedTranslations } from '../lib/util';
+import { PLATFORM_BY_SLUG } from '../data/platforms';
+import Cover from './Cover.astro';
+import TypeTag from './TypeTag.astro';
+import VerdictTag from './VerdictTag.astro';
+import StatusTag from './StatusTag.astro';
+import Icon from './Icon.astro';
+interface Props { game: Game; publisherName?: string; eager?: boolean }
+const { game, publisherName, eager } = Astro.props;
+const d = game.data;
+const p = PLATFORM_BY_SLUG[d.platform];
+const meta = [d.year, publisherName].filter(Boolean).join(' · ');
+const best = rankedTranslations(d.translations)[0];
+---
+<article class="gcard">
+  <a class="gcard__link" href={u(`/games/${game.id}/`)}>
+    <div class="gcard__cover">
+      <Cover cover={d.cover} title={d.title} platform={d.platform} eager={eager} />
+      <span class="tag tag--plat gcard__plat"><Icon name={d.platform} platform />{p.short}</span>
+    </div>
+    <div class="gcard__body">
+      <h3 class="gcard__title">{d.title}</h3>
+      {meta && <p class="gcard__meta">{meta}</p>}
+      <div class="gcard__foot">
+        {best.port && <span class="tag tag--port">Порт</span>}
+        <TypeTag type={best.type} />
+        <VerdictTag verdict={best.verdict} label={best.verdictLabel} note={best.verdictNote} mini />
+        <StatusTag status={best.status} updating={best.updating} note={best.statusNote} hideFull />
+        {d.translations.length > 1 && <span class="gcard__more" title="Переводов у игры">+{d.translations.length - 1}</span>}
+      </div>
+    </div>
+  </a>
+</article>

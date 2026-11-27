@@ -1,0 +1,30 @@
+---
+import { VERDICTS, type Verdict } from '../data/taxonomy';
+import { u } from '../lib/util';
+interface Props {
+  verdict?: Verdict | null;
+  label?: string | null; // своё название метки: «Через боль» вместо «Терпимо»
+  note?: string | null; // своё пояснение модератора вместо стандартного
+  big?: boolean;
+  link?: boolean;
+  mini?: boolean;
+  by?: string | null;
+}
+const { verdict, label, note, big = false, link = false, mini = false, by } = Astro.props;
+const key: Verdict = verdict ?? 'untested';
+const v = VERDICTS[key];
+const name = (key !== 'untested' && label?.trim()) || v.label;
+// подсказка при наведении: что значит и кто поставил
+const title = `Рекомендация: ${name}. ${note?.trim() || v.hint}.${by && key !== 'untested' ? ` Поставил модератор ${by}.` : ''}`.replace(/\.\./g, '.');
+const Tag = link ? 'a' : 'span';
+---
+{mini ? (
+  <span class={`vmeter vmeter--${key}`} title={title} role="img" aria-label={`Рекомендация: ${name}`}>
+    {[1, 2, 3, 4].map((i) => <i class:list={{ on: i <= v.level }}></i>)}
+  </span>
+) : (
+  <Tag class:list={['verdict', `verdict--${key}`, { 'verdict--big': big }]} title={title} href={link ? u(`/search/?verdict=${key}`) : undefined}>
+    <span class={`vmeter vmeter--${key}`} aria-hidden="true">{[1, 2, 3, 4].map((i) => <i class:list={{ on: i <= v.level }}></i>)}</span>
+    {name}
+  </Tag>
+)}

@@ -1,0 +1,105 @@
+---
+import Base from '../../layouts/Base.astro';
+import TypeTag from '../../components/TypeTag.astro';
+import Avatar from '../../components/Avatar.astro';
+import { getTranslatorsWithWorks } from '../../lib/translators';
+import { TRANSLATION_TYPE_KEYS } from '../../data/taxonomy';
+import { u, plural } from '../../lib/util';
+const list = await getTranslatorsWithWorks();
+---
+<Base title="Переводчики" description="Все переводчики архива: их переводы, рекомендации и отзывы игроков.">
+  <div class="wrap trl">
+    <h1>Переводчики</h1>
+    <p class="trl__lead">Люди, благодаря которым в эти игры можно играть на русском. У каждого — своя страница с переводами и отзывами.</p>
+    <ul class="trl__grid">
+      {list.map((t) => (
+        <li>
+          <a class="trcard" href={u(`/translators/${t.id}/`)}>
+            <span class="trcard__top">
+              <Avatar image={t.avatar} name={t.name} size={52} />
+              <span class="trcard__name">{t.name}</span>
+            </span>
+            <span class="trcard__n mono">{t.works.length} {plural(t.works.length, ['перевод', 'перевода', 'переводов'])}</span>
+            <span class="trcard__types">
+              {TRANSLATION_TYPE_KEYS.filter((k) => t.types[k]).map((k) => (
+                <span class="trcard__type"><TypeTag type={k} /><b class="mono">×{t.types[k]}</b></span>
+              ))}
+              {t.types.port && <span class="trcard__type"><span class="tag tag--port">Порт</span><b class="mono">×{t.types.port}</b></span>}
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</Base>
+<style>
+  .trl {
+    padding-top: clamp(28px, 4vw, 52px);
+  }
+  .trl__lead {
+    font-size: var(--s1);
+    max-width: 48ch;
+    margin: 1rem 0 2.4rem;
+  }
+  .trl__grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+    gap: 18px;
+  }
+  .trcard {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 100%;
+    padding: 1.1rem 1.2rem;
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-sm);
+    text-decoration: none;
+    transition:
+      transform 0.12s var(--ease),
+      box-shadow 0.12s var(--ease);
+  }
+  .trcard:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--sh);
+  }
+  .trcard:hover .trcard__name {
+    text-decoration: underline;
+    text-decoration-color: var(--teal);
+    text-decoration-thickness: 3px;
+  }
+  .trcard__top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .trcard__name {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: var(--s1);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  .trcard__n {
+    font-size: 0.85rem;
+    color: var(--ink-2);
+  }
+  .trcard__types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 6px;
+  }
+  .trcard__type {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+  }
+</style>

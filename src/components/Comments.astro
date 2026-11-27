@@ -1,0 +1,448 @@
+---
+import Icon from './Icon.astro';
+import { isDemo } from '../scripts/backend';
+interface Props {
+  gameId: string;
+  keys?: string[];
+  targets?: { key: string; label: string }[];
+  title?: string;
+  placeholder?: string;
+}
+const {
+  gameId,
+  keys = [],
+  targets = [],
+  title = 'Комментарии',
+  placeholder = 'Как вам перевод? Нашли ошибки — напишите, где именно.',
+} = Astro.props;
+---
+<section class="cmts" id="comments" data-game={gameId} data-keys={JSON.stringify(keys)} data-targets={JSON.stringify(targets)} aria-labelledby="cmts-h">
+  <div class="sec-head">
+    <h2 id="cmts-h">{title} <span class="cmts__count mono" data-count></span></h2>
+    <div class="cmts__sort" role="tablist" aria-label="Сортировка">
+      <button type="button" role="tab" aria-selected="true" data-sort="new">Новые</button>
+      <button type="button" role="tab" aria-selected="false" data-sort="top">Лучшие</button>
+    </div>
+  </div>
+
+  <div class="cmts__layout">
+    <form class="cmts__form panel" novalidate>
+      <p class="cmts__as label" data-as hidden></p>
+      <div data-name-wrap>
+        <label class="label" for="c-author">Имя</label>
+        <input class="field" id="c-author" name="author" maxlength="40" placeholder="Аноним" autocomplete="nickname" />
+      </div>
+      {targets.length > 0 && (
+        <div>
+          <label class="label" for="c-tr">О каком переводе</label>
+          <select class="field" id="c-tr" name="translation">
+            <option value="">Об игре в целом</option>
+            {targets.map((t) => <option value={t.key}>{t.label}</option>)}
+          </select>
+        </div>
+      )}
+      <div>
+        <label class="label" for="c-body">Комментарий</label>
+        <textarea class="field" id="c-body" name="body" maxlength="3000" required placeholder={placeholder}></textarea>
+      </div>
+      <!-- Ловушка для ботов: человек это поле не видит -->
+      <div class="cmts__hp" aria-hidden="true">
+        <label>Сайт <input name="website" tabindex="-1" autocomplete="off" /></label>
+      </div>
+      <div class="cmts__form-foot">
+        <button class="btn btn--ink" type="submit">Отправить</button>
+        <span class="cmts__msg" role="status" data-msg></span>
+      </div>
+      <p class="cmts__rules muted">Регистрация не нужна. Комментарии со ссылками не публикуются.</p>
+      {isDemo && <p class="cmts__demo label">Демо-режим: база не подключена, комментарии видите только вы.</p>}
+    </form>
+
+    <div>
+      <ol class="cmts__list" data-list aria-live="polite"></ol>
+      <p class="cmts__empty muted" data-empty hidden>
+        <Icon name="comments" /> Пока никто ничего не написал. Будьте первым — особенно если уже прошли игру.
+      </p>
+      <p class="cmts__empty muted" data-loading>Загружаем комментарии…</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { loadGame, addComment, voteComment, deleteComment, modAuth, errorText, type CommentT, type Vote } from '../scripts/backend';
+
+  const base = (document.documentElement.dataset.base || '/').replace(/\/$/, '');
+  const ico = (n: string) => `<span class="ico" style="--src:url('${base}/icons/ui/${n}.svg')" aria-hidden="true"></span>`;
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  const rtf = new Intl.RelativeTimeFormat('ru', { numeric: 'auto' });
+  const dtf = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  function ago(iso: string) {
+    const s = (new Date(iso).getTime() - Date.now()) / 1000;
+    const steps: [number, Intl.RelativeTimeFormatUnit][] = [[60, 'second'], [60, 'minute'], [24, 'hour'], [30, 'day'], [12, 'month']];
+    let v = s;
+    for (const [n, unit] of steps) {
+      if (Math.abs(v) < n) return unit === 'second' ? 'только что' : rtf.format(Math.round(v), unit);
+      v /= n;
+    }
+    return rtf.format(Math.round(v), 'year');
+  }
+
+  for (const root of document.querySelectorAll<HTMLElement>('.cmts')) {
+    const game = root.dataset.game!;
+    const keys: string[] = JSON.parse(root.dataset.keys || '[]');
+    const targets: { key: string; label: string }[] = JSON.parse(root.dataset.targets || '[]');
+    const tLabel = Object.fromEntries(targets.map((t) => [t.key, t.label]));
+    const list = root.querySelector<HTMLOListElement>('[data-list]')!;
+    const empty = root.querySelector<HTMLElement>('[data-empty]')!;
+    const loading = root.querySelector<HTMLElement>('[data-loading]')!;
+    const count = root.querySelector<HTMLElement>('[data-count]')!;
+    const form = root.querySelector<HTMLFormElement>('form')!;
+    const msg = root.querySelector<HTMLElement>('[data-msg]')!;
+    let items: CommentT[] = [];
+    let sort: 'new' | 'top' = 'new';
+    const mod = modAuth.get();
+
+    // Модератор пишет под своим именем и с пометкой
+    if (mod) {
+      root.querySelector<HTMLElement>('[data-name-wrap]')!.hidden = true;
+      const as = root.querySelector<HTMLElement>('[data-as]')!;
+      as.hidden = false;
+      as.textContent = `Вы пишете как модератор: ${mod.name}`;
+    } else {
+      try {
+        const saved = localStorage.getItem('rp_author');
+        if (saved) (form.elements.namedItem('author') as HTMLInputElement).value = saved;
+      } catch {}
+    }
+
+    const row = (c: CommentT) => `
+      <li class="cmt${c.mod_name ? ' cmt--mod' : ''}" data-id="${c.id}">
+        <div class="cmt__vote">
+          <button type="button" class="cmt__v" data-v="1" aria-pressed="${c.my_vote === 1}" aria-label="Плюс">${ico('arrow-up')}</button>
+          <span class="cmt__score${c.score > 0 ? ' is-pos' : c.score < 0 ? ' is-neg' : ''}">${c.score}</span>
+          <button type="button" class="cmt__v" data-v="-1" aria-pressed="${c.my_vote === -1}" aria-label="Минус">${ico('arrow-down')}</button>
+        </div>
+        <div class="cmt__main">
+          <p class="cmt__meta"><b>${esc(c.mod_name ?? c.author)}</b>${c.mod_name ? '<span class="cmt__modtag">модератор</span>' : ''}
+          <time datetime="${c.created_at}" title="${dtf.format(new Date(c.created_at))}">${ago(c.created_at)}</time>
+          ${mod ? `<button type="button" class="cmt__del" data-del>${ico('trash')}Удалить</button>` : ''}</p>
+          ${c.translation && tLabel[c.translation] ? `<p class="cmt__about">о переводе: ${esc(tLabel[c.translation])}</p>` : ''}
+          <div class="cmt__body"><p>${esc(c.body).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>')}</p></div>
+        </div>
+      </li>`;
+
+    const draw = () => {
+      const sorted = [...items].sort((a, b) =>
+        sort === 'top'
+          ? b.score - a.score || +new Date(b.created_at) - +new Date(a.created_at)
+          : +new Date(b.created_at) - +new Date(a.created_at),
+      );
+      list.innerHTML = sorted.map(row).join('');
+      empty.hidden = items.length > 0;
+      count.textContent = items.length ? String(items.length) : '';
+    };
+
+    loadGame(game, keys)
+      .then((d) => {
+        items = d.comments;
+        loading.remove();
+        draw();
+      })
+      .catch((e) => (loading.textContent = errorText(e)));
+
+    root.querySelectorAll<HTMLButtonElement>('[data-sort]').forEach((b) =>
+      b.addEventListener('click', () => {
+        sort = b.dataset.sort as 'new' | 'top';
+        root.querySelectorAll('[data-sort]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+        draw();
+      }),
+    );
+
+    list.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const li = t.closest<HTMLElement>('.cmt');
+      if (!li) return;
+      const id = Number(li.dataset.id);
+      const c = items.find((x) => x.id === id);
+      if (!c) return;
+      const vb = t.closest<HTMLButtonElement>('.cmt__v');
+      if (vb) {
+        const v = Number(vb.dataset.v) as Vote;
+        const next = (c.my_vote === v ? 0 : v) as Vote;
+        try {
+          const r = await voteComment(game, id, next);
+          c.score = r.score;
+          c.my_vote = r.my_vote as -1 | 0 | 1;
+          li.outerHTML = row(c);
+        } catch (err) {
+          msg.textContent = errorText(err);
+        }
+        return;
+      }
+      if (t.closest('[data-del]') && confirm('Удалить комментарий? Вернуть его будет нельзя.')) {
+        try {
+          await deleteComment(game, id);
+          items = items.filter((x) => x.id !== id);
+          draw();
+        } catch (err) {
+          alert(errorText(err));
+        }
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const btn = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+      btn.disabled = true;
+      msg.textContent = '';
+      msg.className = 'cmts__msg';
+      try {
+        const c = await addComment(
+          game,
+          String(fd.get('author') || ''),
+          String(fd.get('body') || ''),
+          String(fd.get('website') || ''),
+          String(fd.get('translation') || '') || null,
+        );
+        items.unshift(c);
+        draw();
+        (form.elements.namedItem('body') as HTMLTextAreaElement).value = '';
+        if (!mod) try { localStorage.setItem('rp_author', String(fd.get('author') || '')); } catch {}
+        msg.textContent = 'Опубликовано.';
+        msg.classList.add('is-ok');
+      } catch (err) {
+        msg.textContent = errorText(err);
+        msg.classList.add('is-err');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .cmts {
+    margin-top: clamp(56px, 7vw, 96px);
+  }
+  .cmts__count {
+    font-size: 0.55em;
+    vertical-align: 0.4em;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0.05em 0.4em;
+    border-radius: 3px;
+  }
+  .cmts__count:empty {
+    display: none;
+  }
+  .cmts__sort {
+    display: flex;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-btn);
+    overflow: hidden;
+  }
+  .cmts__sort button {
+    font: 700 0.8rem var(--f-mono);
+    text-transform: uppercase;
+    padding: 0.5em 0.9em;
+    border: 0;
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .cmts__sort button + button {
+    border-left: var(--bw-thin) solid var(--line);
+  }
+  .cmts__sort button[aria-selected='true'] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .cmts__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: clamp(24px, 4vw, 48px);
+    align-items: start;
+  }
+  .cmts__form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 1.2rem;
+    position: sticky;
+    top: 92px;
+  }
+  .cmts__form .label {
+    display: block;
+    margin-bottom: 6px;
+  }
+  .cmts__form select.field {
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .cmts__as {
+    margin: 0;
+    padding: 0.45em 0.6em;
+    background: var(--yellow);
+    color: #15130f;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+  }
+  .cmts__hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .cmts__form-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .cmts__msg {
+    font-weight: 600;
+    font-size: 0.92rem;
+  }
+  .cmts__msg.is-err {
+    color: var(--red);
+  }
+  .cmts__msg.is-ok {
+    color: var(--green);
+  }
+  .cmts__rules {
+    font-size: 0.85rem;
+    margin: 0;
+  }
+  .cmts__demo {
+    margin: 0;
+    font-size: 0.7rem;
+    background: var(--yellow);
+    color: #15130f;
+    padding: 0.4em 0.6em;
+    border-radius: var(--r-tag);
+    border: var(--bw-thin) solid var(--line);
+  }
+  .cmts__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .cmts__empty {
+    padding: 1.5rem;
+    border: var(--bw-thin) dashed var(--ink-2);
+    border-radius: var(--r-card);
+    margin: 0;
+  }
+  :global(.cmt) {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 14px;
+    padding: 1rem 0;
+    border-bottom: var(--bw-thin) solid var(--line);
+  }
+  :global(.cmt:first-child) {
+    padding-top: 0;
+  }
+  :global(.cmt--mod .cmt__main) {
+    border-left: 4px solid var(--yellow);
+    padding-left: 12px;
+  }
+  :global(.cmt__vote) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  :global(.cmt__v) {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 30px;
+    background: var(--surface);
+    color: var(--ink-2);
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+    cursor: pointer;
+  }
+  :global(.cmt__v:hover) {
+    color: var(--ink);
+    box-shadow: 2px 2px 0 var(--shadow-c);
+  }
+  :global(.cmt__v[data-v='1'][aria-pressed='true']) {
+    background: var(--teal);
+    color: #15130f;
+  }
+  :global(.cmt__v[data-v='-1'][aria-pressed='true']) {
+    background: var(--magenta);
+    color: #15130f;
+  }
+  :global(.cmt__score) {
+    font-family: var(--f-mono);
+    font-weight: 800;
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+  }
+  :global(.cmt__score.is-pos) {
+    color: color-mix(in srgb, var(--teal) 70%, var(--ink));
+  }
+  :global(.cmt__score.is-neg) {
+    color: var(--magenta);
+  }
+  :global(.cmt__meta) {
+    margin: 0 0 0.3rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.6em;
+  }
+  :global(.cmt__meta time) {
+    font-family: var(--f-mono);
+    font-size: 0.78rem;
+    color: var(--ink-2);
+  }
+  :global(.cmt__modtag) {
+    font: 700 0.68rem var(--f-mono);
+    text-transform: uppercase;
+    background: var(--yellow);
+    color: #15130f;
+    border: 1.5px solid var(--line);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+  }
+  :global(.cmt__about) {
+    margin: 0 0 0.4rem;
+    font-family: var(--f-mono);
+    font-size: 0.75rem;
+    color: var(--ink-2);
+  }
+  :global(.cmt__body p) {
+    margin: 0 0 0.6em;
+    overflow-wrap: anywhere;
+  }
+  :global(.cmt__body p:last-child) {
+    margin: 0;
+  }
+  :global(.cmt__del) {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    font: 700 0.72rem var(--f-mono);
+    text-transform: uppercase;
+    color: var(--red);
+    background: none;
+    border: 1.5px solid var(--red);
+    border-radius: 3px;
+    padding: 0.2em 0.5em;
+    cursor: pointer;
+  }
+  @media (max-width: 860px) {
+    .cmts__layout {
+      grid-template-columns: 1fr;
+    }
+    .cmts__form {
+      position: static;
+    }
+  }
+</style>

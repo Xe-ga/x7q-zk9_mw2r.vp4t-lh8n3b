@@ -1,0 +1,163 @@
+---
+import '../styles/global.css';
+import '../styles/components.css';
+import { SITE } from '../config';
+import { u } from '../lib/util';
+import Icon from '../components/Icon.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  noindex?: boolean;
+  /** что открыть в админке кнопкой «Изменить»: 'games/entries/snatcher' */
+  edit?: string;
+}
+const { title, description = SITE.tagline, image, noindex = false, edit } = Astro.props;
+const adminUrl = (p: string) => u('/admin/index.html') + '#/collections/' + p;
+// карточки игр правятся в редакторе на сайте, остальное — в админке
+const editUrl = (p: string) => (p.startsWith('games/entries/') ? u(`/editor/?game=${p.split('/').at(-1)}`) : adminUrl(p));
+const fullTitle = title ? `${title} — ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
+const path = Astro.url.pathname.replace(import.meta.env.BASE_URL.replace(/\/$/, ''), '') || '/';
+const nav = [
+  { href: '/search/', label: 'Каталог', match: ['/search', '/games'] },
+  { href: '/platforms/', label: 'Платформы', match: ['/platforms'] },
+  { href: '/translators/', label: 'Переводчики', match: ['/translators'] },
+  { href: '/blog/', label: 'Блог', match: ['/blog'] },
+  { href: '/about/', label: 'О проекте', match: ['/about'] },
+];
+const isCurrent = (m: string[]) => m.some((x) => path.startsWith(x));
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html>
+<html lang="ru" data-base={import.meta.env.BASE_URL}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href={u('/favicon.svg')} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    {image && <meta property="og:image" content={new URL(image, Astro.site)} />}
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="theme-color" content="#f2ede1" />
+    <script is:inline>
+      try {
+        const t = localStorage.getItem('theme');
+        if (t) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <a class="sr-only" href="#main">К содержимому</a>
+    <header class="site-head" id="site-head">
+      <div class="wrap site-head__row">
+        <a class="logo" href={u('/')} aria-label={`${SITE.name} — на главную`}>
+          <span class="logo__ru">РУС</span>ПАТЧ
+        </a>
+        <nav class="nav" aria-label="Разделы">
+          {nav.map((n) => <a href={u(n.href)} aria-current={isCurrent(n.match) ? 'page' : undefined}>{n.label}</a>)}
+        </nav>
+        <form class="head-search" action={u('/search/')} method="get" role="search">
+          <label for="head-q" class="sr-only">Поиск по архиву</label>
+          <Icon name="search" />
+          <input id="head-q" class="field" type="search" name="q" placeholder="Найти игру…" autocomplete="off" />
+          <kbd>/</kbd>
+        </form>
+        <button class="icon-btn theme-btn" type="button" id="theme-btn" aria-label="Сменить тему">
+          <Icon name="sun" class="ico-sun" /><Icon name="moon" class="ico-moon" />
+        </button>
+        <button class="icon-btn menu-btn" type="button" id="menu-btn" aria-label="Меню" aria-expanded="false" aria-controls="site-head">
+          <Icon name="bars" />
+        </button>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap site-foot__grid">
+        <div class="site-foot__brand">
+          <a class="logo" href={u('/')}><span class="logo__ru">РУС</span>ПАТЧ</a>
+          <p style="margin-top:1.2rem">{SITE.tagline}. Все файлы лежат в Telegram — сайт только помогает их найти.</p>
+        </div>
+        <div>
+          <h2>Архив</h2>
+          <ul>
+            <li><a href={u('/search/')}>Каталог</a></li>
+            <li><a href={u('/platforms/')}>Платформы</a></li>
+            <li><a href={u('/translators/')}>Переводчики</a></li>
+            <li><a href={u('/blog/')}>Блог</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Связь</h2>
+          <ul>
+            <li><a href={u('/submit/')}>Отправить перевод</a></li>
+            <li><a href={SITE.telegram} rel="noopener">Telegram-канал</a></li>
+            <li><a href={u('/about/#rights')}>Правообладателям</a></li>
+            <li><a href={u('/about/#credits')}>Авторы иконок</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="wrap site-foot__fine">
+        Иконки платформ — libretro/RetroArch (CC BY 4.0), иконки интерфейса — HackerNoon Pixel Icon Library и Pixelarticons (MIT).
+      </div>
+    </footer>
+
+    <!-- Панель модератора: видна только тому, кто вошёл на /moderator/ -->
+    <aside class="modbar" id="modbar" hidden aria-label="Панель модератора">
+      <span class="modbar__who label"><Icon name="user" /><span id="modbar-name"></span></span>
+      {edit && <a class="modbar__btn modbar__btn--main" href={editUrl(edit)}><Icon name="pen" />Изменить эту страницу</a>}
+      <a class="modbar__btn" href={u('/editor/')}><Icon name="tag" />Новая игра</a>
+      <a class="modbar__btn" href={u('/moderator/')}><Icon name="comments" />Заявки</a>
+      <a class="modbar__btn" href={u('/admin/index.html')}><Icon name="cog" />Админка</a>
+      <button class="modbar__btn modbar__x" type="button" id="modbar-hide" aria-label="Скрыть панель"><Icon name="times" /></button>
+    </aside>
+
+    <script>
+      const root = document.documentElement;
+      document.getElementById('theme-btn')?.addEventListener('click', () => {
+        const dark = root.dataset.theme
+          ? root.dataset.theme === 'dark'
+          : matchMedia('(prefers-color-scheme: dark)').matches;
+        root.dataset.theme = dark ? 'light' : 'dark';
+        try { localStorage.setItem('theme', root.dataset.theme); } catch {}
+      });
+      const head = document.getElementById('site-head');
+      const menuBtn = document.getElementById('menu-btn');
+      menuBtn?.addEventListener('click', () => {
+        const open = head!.classList.toggle('is-open');
+        menuBtn.setAttribute('aria-expanded', String(open));
+      });
+      // панель модератора
+      try {
+        const m = JSON.parse(localStorage.getItem('rp_mod') || 'null');
+        const bar = document.getElementById('modbar')!;
+        if (m && sessionStorage.getItem('rp_modbar_hidden') !== '1') {
+          document.getElementById('modbar-name')!.textContent = m.name;
+          bar.hidden = false;
+          document.body.classList.add('has-modbar');
+        }
+        document.getElementById('modbar-hide')?.addEventListener('click', () => {
+          bar.hidden = true;
+          document.body.classList.remove('has-modbar');
+          sessionStorage.setItem('rp_modbar_hidden', '1');
+        });
+      } catch {}
+      // «/» — фокус в поиск
+      document.addEventListener('keydown', (e) => {
+        const t = e.target as HTMLElement;
+        if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(t.tagName) && !t.isContentEditable) {
+          e.preventDefault();
+          (document.getElementById('q') ?? document.getElementById('head-q'))?.focus();
+        }
+      });
+    </script>
+  </body>
+</html>

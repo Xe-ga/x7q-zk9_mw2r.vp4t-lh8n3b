@@ -1,0 +1,101 @@
+---
+import Base from '../../layouts/Base.astro';
+import Icon from '../../components/Icon.astro';
+import { PLATFORMS } from '../../data/platforms';
+import { getGames, u, plural } from '../../lib/util';
+const games = await getGames();
+const counts: Record<string, number> = {};
+for (const g of games) counts[g.data.platform] = (counts[g.data.platform] ?? 0) + 1;
+const makers = [...new Set(PLATFORMS.map((p) => p.maker))];
+---
+<Base title="Платформы" description="Все платформы архива: от NES и PC-98 до Nintendo 3DS.">
+  <div class="wrap plats">
+    <h1>Платформы</h1>
+    <p class="plats__lead">Выберите консоль или компьютер — откроется список всех переводов для неё.</p>
+    {makers.map((m) => (
+      <section class="maker">
+        <h2 class="label maker__h">{m}</h2>
+        <ul class="maker__grid">
+          {PLATFORMS.filter((p) => p.maker === m).map((p) => (
+            <li>
+              <a class:list={['ptile', { 'is-empty': !counts[p.slug] }]} href={u(`/platforms/${p.slug}/`)}>
+                <Icon name={p.slug} platform class="ptile__ico" />
+                <span class="ptile__name">{p.name}</span>
+                <span class="ptile__meta mono">{p.year} · {counts[p.slug] ?? 0} {plural(counts[p.slug] ?? 0, ['перевод', 'перевода', 'переводов'])}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </div>
+</Base>
+<style>
+  .plats {
+    padding-top: clamp(28px, 4vw, 52px);
+  }
+  .plats__lead {
+    font-size: var(--s1);
+    max-width: 44ch;
+    margin: 1rem 0 2.5rem;
+  }
+  .maker {
+    margin-bottom: 2.4rem;
+  }
+  .maker__h {
+    padding-bottom: 0.5rem;
+    border-bottom: var(--bw) solid var(--line);
+    margin-bottom: 1.1rem;
+  }
+  .maker__grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+    gap: 16px;
+  }
+  .ptile {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-sm);
+    text-decoration: none;
+    transition:
+      transform 0.12s var(--ease),
+      box-shadow 0.12s var(--ease),
+      background 0.12s;
+  }
+  .ptile:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--sh);
+    background: var(--yellow);
+    color: #15130f;
+  }
+  .ptile :global(.ptile__ico) {
+    grid-row: 1 / 3;
+    width: 64px;
+    height: 50px;
+  }
+  .ptile__name {
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .ptile__meta {
+    font-size: 0.78rem;
+    color: var(--ink-2);
+  }
+  .ptile:hover .ptile__meta {
+    color: #15130f;
+  }
+  .ptile.is-empty {
+    opacity: 0.55;
+    box-shadow: none;
+  }
+</style>

@@ -1,0 +1,562 @@
+---
+import Base from '../../layouts/Base.astro';
+import GameCard from '../../components/GameCard.astro';
+import Icon from '../../components/Icon.astro';
+import { PLATFORMS } from '../../data/platforms';
+import { TRANSLATION_TYPES, TRANSLATION_TYPE_KEYS, VERDICTS, VERDICT_KEYS, STATUSES, STATUS_KEYS, GENRES } from '../../data/taxonomy';
+import { getGames, getLookups, u, plural } from '../../lib/util';
+
+const games = await getGames();
+const { translators, publishers } = await getLookups();
+const used = <T,>(arr: T[]) => [...new Set(arr)];
+const platforms = PLATFORMS.filter((p) => games.some((g) => g.data.platform === p.slug));
+const genres = GENRES.filter((x) => games.some((g) => g.data.genres.includes(x)));
+const trIds = used(games.flatMap((g) => g.data.translations.flatMap((t) => [...t.translators, ...t.porters].map((x) => x.id)))).sort((a, b) => translators[a].name.localeCompare(translators[b].name, 'ru'));
+const pubIds = used(games.flatMap((g) => (g.data.publisher ? [g.data.publisher.id] : []))).sort((a, b) => publishers[a].name.localeCompare(publishers[b].name, 'ru'));
+const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.data.publisher.id]?.name : undefined);
+
+const groups = [
+  { key: 'type', title: 'Перевод', opts: TRANSLATION_TYPE_KEYS.map((k) => ({ v: k, label: TRANSLATION_TYPES[k].label, cls: `tag--${k}` })) },
+  { key: 'verdict', title: 'Рекомендация', opts: VERDICT_KEYS.map((k) => ({ v: k, label: VERDICTS[k].label, meter: VERDICTS[k].level })) },
+  { key: 'status', title: 'Состояние', opts: [...STATUS_KEYS.map((k) => ({ v: k, label: STATUSES[k].label, ui: STATUSES[k].icon })), { v: 'updating', label: 'Обновляется', ui: 'refresh' }, { v: 'port', label: 'Порт' }] },
+  { key: 'platform', title: 'Платформа', opts: platforms.map((p) => ({ v: p.slug, label: p.short, icon: p.slug, title: p.name })) },
+  { key: 'genre', title: 'Жанр', opts: genres.map((x) => ({ v: x, label: x })) },
+  { key: 'translator', title: 'Переводчик', opts: trIds.map((id) => ({ v: id, label: translators[id].name })), list: true, find: 'Найти переводчика…' },
+  { key: 'publisher', title: 'Издатель', opts: pubIds.map((id) => ({ v: id, label: publishers[id].name })), list: true, find: 'Найти издателя…' },
+].filter((g) => g.opts.length > 0);
+---
+<Base title="Каталог" description="Поиск по архиву русских переводов: по названию, платформе, переводчику, издателю, жанру и качеству перевода.">
+  <div class="wrap cat" id="cat" data-index={u('/search-index.json')}>
+    <header class="cat__head">
+      <h1>Каталог</h1>
+      <form class="cat__search" role="search" onsubmit="return false">
+        <label for="q" class="sr-only">Поиск</label>
+        <Icon name="search" class="cat__search-ico" />
+        <input id="q" class="field" type="search" name="q" autocomplete="off" spellcheck="false"
+          placeholder="Название, переводчик, издатель… Опечатки не страшны" />
+      </form>
+    </header>
+
+    <div class="cat__layout">
+      <aside class="filters" aria-label="Фильтры">
+        <details class="filters__wrap" open>
+          <summary class="filters__sum label">Фильтры <span data-fcount></span></summary>
+          {groups.map((g) => (
+            <fieldset class="fg" data-group={g.key}>
+              <legend class="label">{g.title}</legend>
+              {g.list && (
+                <input class="field fg__find" type="search" placeholder={g.find} aria-label={g.find} autocomplete="off" data-find />
+              )}
+              <div class:list={['fg__opts', { 'fg__opts--list': g.list }]}>
+                {g.opts.map((o: any) => (
+                  <label class:list={['chip', o.cls]} title={o.title}>
+                    <input type="checkbox" name={g.key} value={o.v} />
+                    {o.icon && <Icon name={o.icon} platform />}
+                    {o.ui && <Icon name={o.ui} />}
+                    {o.meter !== undefined && <span class={`vmeter vmeter--${o.v}`} aria-hidden="true">{[1, 2, 3, 4].map((i) => <i class:list={{ on: i <= o.meter }}></i>)}</span>}
+                    <span class="chip__l">{o.label}</span>
+                    <span class="chip__n" data-n></span>
+                  </label>
+                ))}
+              </div>
+              {g.list && <button type="button" class="fg__more" data-more hidden></button>}
+            </fieldset>
+          ))}
+        </details>
+      </aside>
+
+      <section class="results" aria-labelledby="res-h">
+        <div class="results__bar">
+          <h2 id="res-h" class="results__count" aria-live="polite" data-count>
+            {games.length} {plural(games.length, ['перевод', 'перевода', 'переводов'])}
+          </h2>
+          <div class="results__tools">
+            <button type="button" class="btn btn--sm" data-reset hidden><Icon name="times" />Сбросить</button>
+            <label class="sr-only" for="sort">Сортировка</label>
+            <select id="sort" class="field results__sort">
+              <option value="rel">По совпадению</option>
+              <option value="new">Сначала новые</option>
+              <option value="title">По названию</option>
+              <option value="year">По году выхода</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-cards" data-grid>
+          {games.map((g) => <GameCard game={g} publisherName={pubName(g)} />)}
+        </div>
+        <div class="results__empty" data-empty hidden>
+          <p class="results__empty-big">Ничего не нашлось.</p>
+          <p class="muted">Попробуйте написать название иначе, например по-японски или по-английски, или уберите часть фильтров.</p>
+          <button type="button" class="btn btn--yellow" data-reset>Сбросить всё</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { normalize, trigrams, similarity, queryVariants } from '../../scripts/trigram';
+  import { plural } from '../../scripts/plural';
+
+  type Item = {
+    id: string; t: string; a: string[]; p: string; ty: string[]; vl: string | null; st: string[]; sn: string | null; pt: boolean; up: boolean; v: (string | null)[]; n: number; tr: string[]; pu: string | null;
+    dev: string | null; g: string[]; y: number | null; d: string; c: string | null;
+  };
+  type Doc = Item & { fields: { text: string; tri: Set<string>; w: number }[]; acr: string };
+
+  const root = document.getElementById('cat')!;
+  const base = (document.documentElement.dataset.base || '/').replace(/\/$/, '');
+  const q = root.querySelector<HTMLInputElement>('#q')!;
+  const sortSel = root.querySelector<HTMLSelectElement>('#sort')!;
+  const grid = root.querySelector<HTMLElement>('[data-grid]')!;
+  const empty = root.querySelector<HTMLElement>('[data-empty]')!;
+  const countEl = root.querySelector<HTMLElement>('[data-count]')!;
+  const resets = root.querySelectorAll<HTMLButtonElement>('[data-reset]');
+  const fcount = root.querySelector<HTMLElement>('[data-fcount]')!;
+  const GROUPS = ['type', 'verdict', 'status', 'platform', 'genre', 'translator', 'publisher'] as const;
+  type G = (typeof GROUPS)[number];
+
+  const TYPES: Record<string, string> = { manual: 'Ручной', 'ai-edited': 'Нейросеть + правки', ai: 'Нейросетевой', wasted: 'Потрачено' };
+  const PLAT: Record<string, string> = {};
+  root.querySelectorAll<HTMLInputElement>('[data-group=platform] input').forEach((i) => (PLAT[i.value] = i.closest('label')!.querySelector('.chip__l')!.textContent!));
+  const FB = ['var(--teal)', 'var(--yellow)', 'var(--magenta)', 'var(--orange)', 'var(--sky)', 'var(--green)'];
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  const icon = (dir: string, n: string, cls = '') => `<span class="ico ${cls}" style="--src:url('${base}/icons/${dir}/${n}.svg')" aria-hidden="true"></span>`;
+
+  let docs: Doc[] = [];
+  let names = { translators: {} as Record<string, string>, publishers: {} as Record<string, string> };
+
+  const value = (it: Item, g: G): string[] =>
+    g === 'type' ? it.ty : g === 'status' ? it.st : g === 'verdict' ? (it.v.filter(Boolean) as string[]) : g === 'platform' ? [it.p] : g === 'genre' ? it.g : g === 'translator' ? it.tr : it.pu ? [it.pu] : [];
+
+  function selected(): Record<G, Set<string>> {
+    const s = {} as Record<G, Set<string>>;
+    for (const g of GROUPS) s[g] = new Set([...root.querySelectorAll<HTMLInputElement>(`input[name=${g}]:checked`)].map((i) => i.value));
+    return s;
+  }
+
+  function card(it: Item) {
+    const idx = [...it.p].reduce((a, c) => a + c.charCodeAt(0), 0) % FB.length;
+    const cover = it.c
+      ? `<img class="cover-img" src="${it.c}" alt="Обложка: ${esc(it.t)}" loading="lazy">`
+      : `<div class="cover-fallback" style="--fb:${FB[idx]}" role="img" aria-label="Нет обложки: ${esc(it.t)}">${icon('platforms', it.p, 'cover-fallback__ico')}<span class="cover-fallback__title">${esc(it.t)}</span></div>`;
+    const meta = [it.y, it.pu ? names.publishers[it.pu] : null].filter(Boolean).join(' · ');
+    const ty = it.ty[0];
+    const skull = ty === 'wasted' ? icon('ui', 'skull') : '';
+    const VL: Record<string, [number, string]> = { great: [4, 'Отлично'], good: [3, 'Хорошо'], ok: [2, 'Играбельно'], no: [1, 'Терпимо'], untested: [0, 'Не проверено'] };
+    const v0 = it.v[0];
+    const vName = v0 ? (v0 !== 'untested' && it.vl) || VL[v0][1] : '';
+    const meter = v0 ? `<span class="vmeter vmeter--${v0}" role="img" aria-label="Рекомендация: ${esc(vName)}" title="Рекомендация: ${esc(vName)}">${[1, 2, 3, 4].map((i) => `<i${i <= VL[v0][0] ? ' class="on"' : ''}></i>`).join('')}</span>` : '';
+    const ST: Record<string, [string, string]> = { partial: ['Частичный', 'exclamation-triangle'], wip: ['В процессе', 'clock'] };
+    const st0 = ST[it.st[0]];
+    const stat = st0 ? `<span class="status status--${it.st[0]}"${it.sn ? ` title="${esc(it.sn)}"` : ''}>${icon('ui', st0[1])}${st0[0]}${it.sn ? '<sup>*</sup>' : ''}</span>` : '';
+    const upd = it.up ? `<span class="status status--upd">${icon('ui', 'refresh')}Обновляется</span>` : '';
+    const more = it.n > 1 ? `<span class="gcard__more" title="Переводов у игры">+${it.n - 1}</span>` : '';
+    return `<article class="gcard"><a class="gcard__link" href="${base}/games/${it.id}/">
+      <div class="gcard__cover">${cover}<span class="tag tag--plat gcard__plat">${icon('platforms', it.p)}${esc(PLAT[it.p] ?? it.p)}</span></div>
+      <div class="gcard__body"><h3 class="gcard__title">${esc(it.t)}</h3>${meta ? `<p class="gcard__meta">${esc(String(meta))}</p>` : ''}
+      <div class="gcard__foot">${it.pt ? '<span class="tag tag--port">Порт</span>' : ''}<span class="tag tag--${ty}">${skull}${TYPES[ty]}</span>${meter}${stat}${upd}${more}</div></div></a></article>`;
+  }
+
+  function score(d: Doc, variants: { n: string; tri: Set<string> }[]) {
+    let best = 0;
+    // аббревиатуры: «bof» → Breath of Fire, «hm64» → Harvest Moon 64
+    for (const v of variants) if (!v.n.includes(' ') && v.n.length >= 2 && v.n.length <= 6 && d.acr.startsWith(v.n)) best = 0.9;
+    for (const v of variants) for (const f of d.fields) best = Math.max(best, similarity(v.n, v.tri, f.text, f.tri) * f.w);
+    return best;
+  }
+
+  // Длинные списки (переводчики, издатели): видны выбранные + первые 5 по числу переводов.
+  // Строка поиска над списком ищет по всем; «Показать всех» раскрывает список целиком.
+  const TOP = 5;
+  const expanded = new Set<string>();
+  const lastCounts: Record<string, Record<string, number>> = {};
+  function listVisibility(g: string, counts?: Record<string, number>) {
+    const fs = root.querySelector<HTMLElement>(`fieldset[data-group=${g}]`);
+    const find = fs?.querySelector<HTMLInputElement>('[data-find]');
+    if (!fs || !find) return;
+    if (counts) lastCounts[g] = counts;
+    const c = lastCounts[g] ?? {};
+    const q = normalize(find.value);
+    const qs = q ? queryVariants(find.value) : [];
+    const labels = [...fs.querySelectorAll<HTMLLabelElement>('label.chip')];
+    const ranked = [...labels].sort((a, b) => (c[b.querySelector('input')!.value] ?? 0) - (c[a.querySelector('input')!.value] ?? 0));
+    const top = new Set(ranked.slice(0, TOP));
+    let hidden = 0;
+    for (const lab of labels) {
+      const checked = lab.querySelector('input')!.checked;
+      const name = normalize(lab.querySelector('.chip__l')!.textContent || '');
+      const show = q ? qs.some((x) => name.includes(x)) || checked : checked || top.has(lab) || expanded.has(g);
+      lab.hidden = !show;
+      if (!show && !q) hidden++;
+    }
+    // по числу переводов, а не по алфавиту
+    const box = fs.querySelector('.fg__opts')!;
+    for (const lab of ranked) box.appendChild(lab);
+    const more = fs.querySelector<HTMLButtonElement>('[data-more]')!;
+    more.hidden = !!q || (!hidden && !expanded.has(g)) || labels.length <= TOP;
+    more.textContent = expanded.has(g) ? 'Свернуть' : `Показать всех (${labels.length})`;
+  }
+  root.querySelectorAll<HTMLInputElement>('[data-find]').forEach((inp) => {
+    const g = inp.closest<HTMLElement>('fieldset')!.dataset.group!;
+    inp.addEventListener('input', () => listVisibility(g));
+    inp.addEventListener('keydown', (e) => e.key === 'Enter' && e.preventDefault());
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-more]').forEach((b) => {
+    const g = b.closest<HTMLElement>('fieldset')!.dataset.group!;
+    b.addEventListener('click', () => {
+      expanded.has(g) ? expanded.delete(g) : expanded.add(g);
+      listVisibility(g);
+    });
+  });
+
+  function run(push = true) {
+    const sel = selected();
+    const text = q.value.trim();
+    const variants = text ? queryVariants(text).map((n) => ({ n, tri: trigrams(n) })) : [];
+
+    // 1) текстовый поиск
+    let pool: { d: Doc; s: number }[] = docs.map((d) => ({ d, s: variants.length ? score(d, variants) : 1 }));
+    if (variants.length) {
+      const top = Math.max(0, ...pool.map((x) => x.s));
+      const cut = Math.max(0.32, top * 0.55);
+      pool = pool.filter((x) => x.s >= cut);
+    }
+
+    // 2) фильтры: внутри группы — «или», между группами — «и»
+    const passes = (d: Doc, except?: G) =>
+      GROUPS.every((g) => g === except || !sel[g].size || value(d, g).some((v) => sel[g].has(v)));
+
+    // счётчики у фильтров с учётом остальных выбранных фильтров
+    for (const g of GROUPS) {
+      const counts: Record<string, number> = {};
+      for (const { d } of pool) if (passes(d, g)) for (const v of value(d, g)) counts[v] = (counts[v] ?? 0) + 1;
+      root.querySelectorAll<HTMLInputElement>(`input[name=${g}]`).forEach((i) => {
+        const n = counts[i.value] ?? 0;
+        const lab = i.closest('label')!;
+        lab.querySelector('[data-n]')!.textContent = String(n);
+        lab.classList.toggle('is-zero', n === 0 && !i.checked);
+      });
+      listVisibility(g, counts);
+    }
+
+    const res = pool.filter(({ d }) => passes(d));
+    const sort = sortSel.value === 'rel' && !variants.length ? 'new' : sortSel.value;
+    res.sort((a, b) =>
+      sort === 'rel' ? b.s - a.s || b.d.d.localeCompare(a.d.d)
+      : sort === 'title' ? a.d.t.localeCompare(b.d.t, 'ru')
+      : sort === 'year' ? (a.d.y ?? 9999) - (b.d.y ?? 9999)
+      : b.d.d.localeCompare(a.d.d),
+    );
+
+    grid.innerHTML = res.map((x) => card(x.d)).join('');
+    empty.hidden = res.length > 0;
+    countEl.textContent = `${res.length} ${plural(res.length, ['перевод', 'перевода', 'переводов'])}${text ? ` по запросу «${text}»` : ''}`;
+    const nSel = GROUPS.reduce((a, g) => a + sel[g].size, 0);
+    fcount.textContent = nSel ? `· ${nSel}` : '';
+    resets[0].hidden = !nSel && !text;
+
+    // состояние в адресной строке — ссылкой на подборку можно поделиться
+    if (push) {
+      const p = new URLSearchParams();
+      if (text) p.set('q', text);
+      for (const g of GROUPS) if (sel[g].size) p.set(g, [...sel[g]].join(','));
+      if (sortSel.value !== 'rel') p.set('sort', sortSel.value);
+      history.replaceState(null, '', p.size ? `?${p}` : location.pathname);
+    }
+  }
+
+  function fromUrl() {
+    const p = new URLSearchParams(location.search);
+    q.value = p.get('q') ?? '';
+    const head = document.getElementById('head-q') as HTMLInputElement | null;
+    if (head) head.value = q.value;
+    sortSel.value = p.get('sort') ?? 'rel';
+    for (const g of GROUPS) {
+      const vals = new Set((p.get(g) ?? '').split(',').filter(Boolean));
+      root.querySelectorAll<HTMLInputElement>(`input[name=${g}]`).forEach((i) => (i.checked = vals.has(i.value)));
+    }
+  }
+
+  async function init() {
+    fromUrl();
+    const data = await fetch(root.dataset.index!).then((r) => r.json());
+    names = data.names;
+    docs = (data.items as Item[]).map((it) => {
+      const f = (text: string, w: number) => ({ text, tri: trigrams(text), w });
+      const fields = [f(it.t, 1), ...it.a.map((x) => f(x, 0.95))];
+      for (const id of it.tr) if (names.translators[id]) fields.push(f(names.translators[id], 0.85));
+      if (it.pu && names.publishers[it.pu]) fields.push(f(names.publishers[it.pu], 0.8));
+      if (it.dev) fields.push(f(it.dev, 0.75));
+      const acr = normalize(it.t).split(' ').map((w) => (/^\d+$/.test(w) ? w : w[0])).join('');
+      return { ...it, fields, acr };
+    });
+    run(false);
+    if (matchMedia('(max-width: 860px)').matches) {
+      const det = root.querySelector('details')!;
+      det.open = GROUPS.some((g) => selected()[g].size);
+    }
+  }
+
+  let t: number | undefined;
+  q.addEventListener('input', () => {
+    clearTimeout(t);
+    t = window.setTimeout(() => run(), 90);
+  });
+  root.addEventListener('change', (e) => {
+    if ((e.target as HTMLElement).matches('input[type=checkbox], select')) run();
+  });
+  resets.forEach((b) =>
+    b.addEventListener('click', () => {
+      q.value = '';
+      root.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach((i) => (i.checked = false));
+      run();
+      q.focus();
+    }),
+  );
+  init().catch(() => (countEl.textContent = 'Не удалось загрузить поиск. Обновите страницу.'));
+  if (!new URLSearchParams(location.search).size) q.focus({ preventScroll: true });
+</script>
+
+<style>
+  .cat {
+    padding-top: clamp(28px, 4vw, 52px);
+  }
+  .cat__head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: clamp(16px, 4vw, 48px);
+    align-items: center;
+    margin-bottom: clamp(24px, 3vw, 40px);
+  }
+  .cat__search {
+    position: relative;
+  }
+  .cat__search .field {
+    font-size: 1.15rem;
+    padding: 0.85em 1em 0.85em 2.8em;
+    box-shadow: var(--sh);
+  }
+  .cat__search :global(.cat__search-ico) {
+    position: absolute;
+    left: 1em;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.3em;
+    height: 1.3em;
+  }
+  .cat__layout {
+    display: grid;
+    grid-template-columns: 270px minmax(0, 1fr);
+    gap: clamp(24px, 3.5vw, 48px);
+    align-items: start;
+  }
+  .filters {
+    position: sticky;
+    top: 92px;
+    max-height: calc(100vh - 110px);
+    overflow: auto;
+    padding: 4px 8px 8px 4px;
+    scrollbar-width: thin;
+  }
+  .filters__sum {
+    display: none;
+    cursor: pointer;
+  }
+  .fg {
+    border: 0;
+    margin: 0 0 1.4rem;
+    padding: 0;
+    min-width: 0;
+  }
+  .fg legend {
+    padding: 0;
+    margin-bottom: 0.6rem;
+    color: var(--ink-2);
+  }
+  .fg__opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .fg__opts--list {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.32em 0.55em;
+    font: 700 0.8rem/1.1 var(--f-mono);
+    background: var(--surface);
+    color: var(--ink);
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.1s var(--ease), box-shadow 0.1s var(--ease);
+  }
+  .chip:hover {
+    box-shadow: 2px 2px 0 var(--shadow-c);
+    transform: translate(-1px, -1px);
+  }
+  .chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .chip:has(input:focus-visible) {
+    outline: 3px solid var(--teal);
+    outline-offset: 2px;
+  }
+  .chip :global(.ico) {
+    width: 1.5em;
+    height: 1.3em;
+  }
+  .chip__n {
+    font-size: 0.7rem;
+    opacity: 0.6;
+  }
+  .chip__n:empty {
+    display: none;
+  }
+  .chip:has(input:checked) {
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: 2px 2px 0 var(--teal);
+  }
+  /* Метки перевода — в своих цветах, выбранная получает чёрную рамку-тень */
+  .chip.tag--manual { background: var(--t-manual); color: #15130f; }
+  .chip.tag--ai-edited { background: var(--t-ai-edited); color: #15130f; }
+  .chip.tag--ai { background: var(--t-ai); color: #15130f; }
+  .chip.tag--wasted { background: var(--t-wasted); color: #fff; }
+  .chip[class*='tag--']:has(input:checked) {
+    box-shadow: 3px 3px 0 var(--shadow-c);
+    transform: translate(-1px, -1px);
+    outline: 2px solid var(--line);
+  }
+  .chip[class*='tag--']:has(input:checked) .chip__l::before {
+    content: '✓ ';
+  }
+  .fg__opts--list .chip {
+    justify-content: space-between;
+    font-family: var(--f-body);
+    font-weight: 600;
+    font-size: 0.92rem;
+    border-color: transparent;
+    background: transparent;
+    padding: 0.35em 0.5em;
+  }
+  .fg__opts--list .chip:hover {
+    border-color: var(--line);
+    background: var(--surface);
+  }
+  .fg__opts--list .chip:has(input:checked) {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--line);
+  }
+  .chip.is-zero {
+    opacity: 0.4;
+  }
+  .fg__find {
+    font-size: 0.88rem;
+    padding: 0.45em 0.6em;
+    border-width: var(--bw-thin);
+    margin-bottom: 6px;
+  }
+  .fg__more {
+    margin-top: 6px;
+    padding: 0.2em 0;
+    font: 700 0.75rem var(--f-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    background: none;
+    border: 0;
+    border-bottom: var(--bw-thin) solid currentColor;
+    cursor: pointer;
+  }
+  .fg__more:hover {
+    background: var(--yellow);
+    color: #15130f;
+  }
+
+  .results__bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 0.8rem;
+    margin-bottom: 1.4rem;
+    border-bottom: var(--bw) solid var(--line);
+  }
+  .results__count {
+    font-size: var(--s1);
+    font-weight: 700;
+  }
+  .results__tools {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .results__sort {
+    width: auto;
+    padding: 0.45em 0.7em;
+    font-size: 0.92rem;
+    border-width: var(--bw-thin);
+    cursor: pointer;
+  }
+  .results__empty {
+    padding: clamp(24px, 4vw, 48px);
+    border: var(--bw) dashed var(--line);
+    border-radius: var(--r-panel);
+    text-align: left;
+  }
+  .results__empty-big {
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: var(--s3);
+    letter-spacing: 0;
+    margin-bottom: 0.4rem;
+  }
+
+  @media (max-width: 860px) {
+    .cat__head {
+      grid-template-columns: 1fr;
+    }
+    .cat__layout {
+      grid-template-columns: 1fr;
+    }
+    .filters {
+      position: static;
+      max-height: none;
+      overflow: visible;
+      padding: 0;
+    }
+    .filters__wrap {
+      border: var(--bw) solid var(--line);
+      border-radius: var(--r-card);
+      background: var(--surface);
+      padding: 0.8rem 1rem;
+    }
+    .filters__wrap[open] {
+      padding-bottom: 0.2rem;
+    }
+    .filters__sum {
+      display: list-item;
+      margin-bottom: 0;
+    }
+    .filters__wrap[open] .filters__sum {
+      margin-bottom: 1rem;
+    }
+    .fg__opts--list {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+</style>

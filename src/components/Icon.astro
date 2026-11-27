@@ -1,0 +1,7 @@
+---
+import { u } from '../lib/util';
+interface Props { name: string; platform?: boolean; class?: string; label?: string }
+const { name, platform = false, class: cls = '', label } = Astro.props;
+const src = u(`/icons/${platform ? 'platforms' : 'ui'}/${name}.svg`);
+---
+<span class={`ico ${cls}`} style={`--src:url('${src}')`} aria-hidden={label ? undefined : 'true'} role={label ? 'img' : undefined} aria-label={label}></span>

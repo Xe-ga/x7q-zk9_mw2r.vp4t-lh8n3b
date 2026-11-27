@@ -1,0 +1,241 @@
+---
+import Base from '../layouts/Base.astro';
+import { PLATFORMS } from '../data/platforms';
+const platNames = JSON.stringify(Object.fromEntries(PLATFORMS.map((p) => [p.slug, p.name])));
+---
+<Base title="Вход модератора" noindex>
+  <div class="wrap mod">
+    <h1>Модератор</h1>
+    <p class="mod__lead">
+      У каждого модератора свой ключ. После входа ключ сохранится в этом браузере: у комментариев появится кнопка
+      «Удалить», ваши комментарии будут подписаны вашим именем, а ниже появятся присланные переводы.
+    </p>
+    <form class="mod__form panel" id="mod-form">
+      <label class="label" for="mod-key">Ключ</label>
+      <input class="field" id="mod-key" type="password" autocomplete="current-password" required />
+      <div class="mod__row">
+        <button class="btn btn--ink" type="submit">Войти</button>
+        <button class="btn" type="button" id="mod-out" hidden>Выйти</button>
+      </div>
+      <p class="mod__msg" role="status" id="mod-msg"></p>
+    </form>
+
+    <section class="inbox" id="inbox" hidden aria-labelledby="inbox-h" data-plats={platNames}>
+      <div class="sec-head">
+        <h2 id="inbox-h">Присланные переводы</h2>
+        <div class="inbox__tabs" role="tablist">
+          <button type="button" role="tab" aria-selected="true" data-f="new">Новые</button>
+          <button type="button" role="tab" aria-selected="false" data-f="all">Все</button>
+        </div>
+      </div>
+      <p class="muted inbox__how">
+        Принятый перевод нужно добавить в архив вручную через админку (/admin/). Отметка «Принят» здесь —
+        просто чтобы другие модераторы не взялись за него второй раз.
+      </p>
+      <ol class="inbox__list" id="inbox-list"></ol>
+      <p class="muted" id="inbox-empty" hidden>Новых заявок нет.</p>
+    </section>
+  </div>
+</Base>
+<script>
+  import { modAuth, checkModKey, listSubmissions, setSubmissionState, errorText, type SubmissionRow } from '../scripts/backend';
+  const form = document.getElementById('mod-form') as HTMLFormElement;
+  const msg = document.getElementById('mod-msg')!;
+  const out = document.getElementById('mod-out')!;
+  const inbox = document.getElementById('inbox')!;
+  const list = document.getElementById('inbox-list')!;
+  const empty = document.getElementById('inbox-empty')!;
+  let rows: SubmissionRow[] = [];
+  let filter: 'new' | 'all' = 'new';
+
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  const KIND: Record<string, string> = { manual: 'Ручной', 'ai-edited': 'Нейросеть + правки', ai: 'Нейросетевой', port: 'Порт' };
+  const STATE: Record<string, string> = { new: 'Новая', accepted: 'Принят', rejected: 'Отклонён' };
+  const PLAT: Record<string, string> = JSON.parse(inbox.dataset.plats || '{}');
+  const dtf = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+
+  function draw() {
+    const shown = rows.filter((r) => filter === 'all' || r.state === 'new');
+    list.innerHTML = shown
+      .map(
+        (r) => `<li class="sreq sreq--${r.state}" data-id="${r.id}">
+          <div class="sreq__head"><b class="sreq__game">${esc(r.game)}</b>
+            <span class="sreq__state">${STATE[r.state]}${r.handled_by ? ' · ' + esc(r.handled_by) : ''}</span></div>
+          <p class="sreq__meta mono">${dtf.format(new Date(r.created_at))}${r.platform ? ' · ' + esc(PLAT[r.platform] ?? r.platform) : ''}${r.kind ? ' · ' + (KIND[r.kind] ?? esc(r.kind)) : ''}</p>
+          <p><span class="muted">Переводчики:</span> ${esc(r.translators)}</p>
+          <p><a href="${esc(r.link)}" rel="noopener nofollow" target="_blank">${esc(r.link)}</a></p>
+          ${r.contact ? `<p><span class="muted">Связь:</span> ${esc(r.contact)}</p>` : ''}
+          ${r.comment ? `<p class="sreq__comment">${esc(r.comment)}</p>` : ''}
+          <div class="sreq__btns">
+            <button type="button" class="btn btn--sm btn--primary" data-s="accepted">Принят</button>
+            <button type="button" class="btn btn--sm" data-s="rejected">Отклонить</button>
+            ${r.state !== 'new' ? '<button type="button" class="btn btn--sm" data-s="new">Вернуть в новые</button>' : ''}
+          </div>
+        </li>`,
+      )
+      .join('');
+    empty.hidden = shown.length > 0;
+  }
+
+  async function loadInbox() {
+    try {
+      rows = await listSubmissions();
+      draw();
+    } catch (e) {
+      empty.hidden = false;
+      empty.textContent = errorText(e);
+    }
+  }
+
+  const sync = () => {
+    const m = modAuth.get();
+    out.hidden = !m;
+    inbox.hidden = !m;
+    msg.textContent = m ? `Вы вошли как ${m.name}. Откройте любую игру — у комментариев есть кнопка «Удалить».` : '';
+    if (m) loadInbox();
+  };
+  sync();
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = (document.getElementById('mod-key') as HTMLInputElement).value.trim();
+    msg.textContent = 'Проверяем…';
+    try {
+      const name = await checkModKey(key);
+      if (name) {
+        modAuth.set({ key, name });
+        sync();
+      } else msg.textContent = 'Неверный ключ.';
+    } catch {
+      msg.textContent = 'Не удалось проверить ключ — нет связи с сервером.';
+    }
+  });
+  out.addEventListener('click', () => {
+    modAuth.set(null);
+    sync();
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-f]').forEach((b) =>
+    b.addEventListener('click', () => {
+      filter = b.dataset.f as 'new' | 'all';
+      document.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      draw();
+    }),
+  );
+  list.addEventListener('click', async (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-s]');
+    if (!b) return;
+    const id = Number(b.closest<HTMLElement>('[data-id]')!.dataset.id);
+    try {
+      await setSubmissionState(id, b.dataset.s as SubmissionRow['state']);
+      await loadInbox();
+    } catch (err) {
+      alert(errorText(err));
+    }
+  });
+</script>
+<style>
+  .mod {
+    padding-top: clamp(28px, 4vw, 52px);
+    max-width: 860px;
+  }
+  .mod__lead {
+    margin: 1rem 0 1.6rem;
+    max-width: 52ch;
+  }
+  .mod__form {
+    padding: 1.3rem;
+    display: grid;
+    gap: 8px;
+    max-width: 560px;
+  }
+  .mod__row {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .mod__msg {
+    margin: 0.5rem 0 0;
+    font-weight: 600;
+  }
+  .inbox {
+    margin-top: clamp(40px, 5vw, 64px);
+  }
+  .inbox__how {
+    font-size: 0.92rem;
+    max-width: 60ch;
+  }
+  .inbox__tabs {
+    display: flex;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-btn);
+    overflow: hidden;
+  }
+  .inbox__tabs button {
+    font: 700 0.8rem var(--f-mono);
+    text-transform: uppercase;
+    padding: 0.5em 0.9em;
+    border: 0;
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .inbox__tabs button + button {
+    border-left: var(--bw-thin) solid var(--line);
+  }
+  .inbox__tabs button[aria-selected='true'] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .inbox__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px;
+  }
+  :global(.sreq) {
+    padding: 1rem 1.1rem;
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-sm);
+    overflow-wrap: anywhere;
+  }
+  :global(.sreq p) {
+    margin: 0.3rem 0;
+  }
+  :global(.sreq--accepted),
+  :global(.sreq--rejected) {
+    opacity: 0.6;
+    box-shadow: none;
+  }
+  :global(.sreq__head) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px 12px;
+  }
+  :global(.sreq__game) {
+    font-family: var(--f-display);
+    font-size: var(--s1);
+  }
+  :global(.sreq__state) {
+    font: 700 0.75rem var(--f-mono);
+    text-transform: uppercase;
+  }
+  :global(.sreq__meta) {
+    font-size: 0.8rem;
+    color: var(--ink-2);
+  }
+  :global(.sreq__comment) {
+    padding: 0.5rem 0.7rem;
+    background: var(--paper);
+    border-left: 4px solid var(--ink-2);
+  }
+  :global(.sreq__btns) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 0.7rem;
+  }
+</style>

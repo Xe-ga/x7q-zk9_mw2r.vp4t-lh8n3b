@@ -1,0 +1,201 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { PLATFORMS } from '../data/platforms';
+import { TRANSLATION_TYPES, TRANSLATION_TYPE_KEYS } from '../data/taxonomy';
+import { SITE } from '../config';
+import { isDemo } from '../scripts/backend';
+---
+<Base title="Отправить перевод" description="Сделали русский перевод ретро-игры? Пришлите его — модераторы проверят и добавят в архив.">
+  <div class="wrap sub">
+    <div class="sub__grid">
+      <div>
+        <h1>Отправить перевод</h1>
+        <p class="sub__lead">
+          Сделали перевод сами или нашли чужой, которого нет в архиве? Пришлите ссылку — модераторы попробуют его,
+          поставят метки и добавят на сайт.
+        </p>
+        <ol class="sub__steps">
+          <li><span><b>Вы присылаете</b> ссылку на перевод и пару слов о нём.</span></li>
+          <li><span><b>Модератор проверяет:</b> ставит тип, рекомендацию и пишет короткий отзыв.</span></li>
+          <li><span><b>Перевод появляется</b> в архиве, а вы — на странице переводчика.</span></li>
+        </ol>
+        <p class="muted sub__alt">
+          Удобнее в Telegram? Напишите в <a href={SITE.telegram} rel="noopener">наш канал</a>.
+        </p>
+      </div>
+
+      <form class="sub__form panel" id="sub-form" novalidate>
+        <div class="sub__row">
+          <label class="label" for="s-game">Игра *</label>
+          <input class="field" id="s-game" name="game" required maxlength="120" placeholder="Например: Mother 3" />
+        </div>
+        <div class="sub__two">
+          <div class="sub__row">
+            <label class="label" for="s-platform">Платформа</label>
+            <select class="field" id="s-platform" name="platform">
+              <option value="">— не знаю / другая —</option>
+              {PLATFORMS.map((p) => <option value={p.slug}>{p.name}</option>)}
+            </select>
+          </div>
+          <div class="sub__row">
+            <label class="label" for="s-kind">Как сделан перевод</label>
+            <select class="field" id="s-kind" name="kind">
+              <option value="">— не знаю —</option>
+              {TRANSLATION_TYPE_KEYS.filter((k) => k !== 'wasted').map((k) => <option value={k}>{TRANSLATION_TYPES[k].label}</option>)}
+              <option value="port">Порт чужого перевода</option>
+            </select>
+          </div>
+        </div>
+        <div class="sub__row">
+          <label class="label" for="s-tr">Кто переводил *</label>
+          <input class="field" id="s-tr" name="translators" required maxlength="200" placeholder="Ник или ники через запятую" />
+        </div>
+        <div class="sub__row">
+          <label class="label" for="s-link">Ссылка на перевод *</label>
+          <input class="field" id="s-link" name="link" type="url" required maxlength="500" placeholder="https://…" />
+        </div>
+        <div class="sub__row">
+          <label class="label" for="s-contact">Как с вами связаться</label>
+          <input class="field" id="s-contact" name="contact" maxlength="120" placeholder="Telegram, почта — если хотите узнать о результате" />
+        </div>
+        <div class="sub__row">
+          <label class="label" for="s-comment">Комментарий</label>
+          <textarea class="field" id="s-comment" name="comment" maxlength="2000" placeholder="Что переведено, что нет, с какой версией игры работает…"></textarea>
+        </div>
+        <div class="cmts__hp" aria-hidden="true" style="position:absolute;left:-9999px">
+          <label>Сайт <input name="website" tabindex="-1" autocomplete="off" /></label>
+        </div>
+        <div class="sub__foot">
+          <button class="btn btn--primary btn--big" type="submit"><Icon name="upload" />Отправить</button>
+          <span class="sub__msg" role="status" id="s-msg"></span>
+        </div>
+        {isDemo && <p class="cmts__demo label">Демо-режим: заявка сохранится только в этом браузере.</p>}
+      </form>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { submitTranslation, errorText } from '../scripts/backend';
+  const form = document.getElementById('sub-form') as HTMLFormElement;
+  const msg = document.getElementById('s-msg')!;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const val = (k: string) => String(fd.get(k) || '').trim();
+    const btn = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    btn.disabled = true;
+    msg.className = 'sub__msg';
+    msg.textContent = 'Отправляем…';
+    try {
+      await submitTranslation(
+        { game: val('game'), platform: val('platform'), translators: val('translators'), link: val('link'), kind: val('kind'), contact: val('contact'), comment: val('comment') },
+        val('website'),
+      );
+      form.reset();
+      msg.textContent = 'Спасибо! Заявка у модераторов.';
+      msg.classList.add('is-ok');
+    } catch (err) {
+      msg.textContent = (err as Error).message === 'EMPTY' ? 'Заполните игру и переводчика.' : errorText(err);
+      msg.classList.add('is-err');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .sub {
+    padding-top: clamp(28px, 4vw, 52px);
+  }
+  .sub__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: clamp(28px, 5vw, 64px);
+    align-items: start;
+  }
+  .sub__lead {
+    font-size: var(--s1);
+    line-height: 1.45;
+    margin: 1.2rem 0 1.6rem;
+    max-width: 40ch;
+  }
+  .sub__steps {
+    margin: 0 0 1.6rem;
+    padding: 0;
+    list-style: none;
+    counter-reset: s;
+    display: grid;
+    gap: 12px;
+  }
+  .sub__steps li {
+    counter-increment: s;
+    display: grid;
+    grid-template-columns: 2.2rem minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+  .sub__steps li::before {
+    content: counter(s);
+    display: grid;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    font-family: var(--f-display);
+    font-weight: 800;
+    background: var(--yellow);
+    color: #15130f;
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-tag);
+  }
+  .sub__form {
+    padding: clamp(16px, 2.5vw, 26px);
+    display: grid;
+    gap: 14px;
+    position: relative;
+  }
+  .sub__row .label {
+    display: block;
+    margin-bottom: 6px;
+  }
+  .sub__two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .sub__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+  }
+  .sub__msg {
+    font-weight: 600;
+  }
+  .sub__msg.is-ok {
+    color: var(--green);
+  }
+  .sub__msg.is-err {
+    color: var(--red);
+  }
+  .cmts__demo {
+    margin: 0;
+    font-size: 0.7rem;
+    background: var(--yellow);
+    color: #15130f;
+    padding: 0.4em 0.6em;
+    border-radius: var(--r-tag);
+    border: var(--bw-thin) solid var(--line);
+  }
+  @media (max-width: 860px) {
+    .sub__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (max-width: 520px) {
+    .sub__two {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

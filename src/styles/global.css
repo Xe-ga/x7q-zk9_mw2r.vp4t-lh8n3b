@@ -1,0 +1,676 @@
+/* ==========================================================
+   РУСПАТЧ — необрутализм.
+   Правила: толстые чёрные линии, жёсткие тени без размытия,
+   плоские цветные плашки, акцентный цвет только у главных действий.
+   ========================================================== */
+
+@import '@fontsource-variable/unbounded/index.css';
+@import '@fontsource-variable/golos-text/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
+
+:root {
+  /* Палитра */
+  --paper: #f2ede1;
+  --paper-2: #e7dfcc;
+  --surface: #fffdf7;
+  --ink: #15130f;
+  --ink-2: #514b40;
+  --line: #15130f;
+  --shadow-c: #15130f;
+
+  --teal: #14b3ad;
+  --magenta: #e0408f;
+  --yellow: #ffcf33;
+  --orange: #ff7f1f;
+  --red: #e1352b;
+  --green: #36b24a;
+  --sky: #8fd3ff;
+
+  /* Цвета меток перевода */
+  --t-manual: var(--green);
+  --t-ai-edited: #e8d83a; /* жёлтый с лёгкой зеленцой: между «Ручным» и «Нейросетевым» */
+  --t-ai: var(--orange);
+  --t-wasted: var(--red);
+
+  /* Шрифты */
+  --f-display: 'Unbounded Variable', 'Arial Black', sans-serif;
+  --f-body: 'Golos Text Variable', 'Segoe UI', system-ui, sans-serif;
+  --f-mono: 'JetBrains Mono Variable', ui-monospace, Consolas, monospace;
+
+  /* Модульная шкала 1.25 от 17px */
+  --s-1: 0.8125rem;
+  --s0: 1.0625rem;
+  --s1: 1.328rem;
+  --s2: 1.66rem;
+  --s3: 2.075rem;
+  --s4: 2.594rem;
+  --s5: 3.242rem;
+  --s6: 4.05rem;
+
+  /* Обводки и тени */
+  --bw: 3px;
+  --bw-thin: 2px;
+  --sh-sm: 3px 3px 0 var(--shadow-c);
+  --sh: 5px 5px 0 var(--shadow-c);
+  --sh-lg: 8px 8px 0 var(--shadow-c);
+
+  /* Скругления по ролям, а не одно на всё */
+  --r-tag: 4px;
+  --r-btn: 6px;
+  --r-card: 10px;
+  --r-panel: 14px;
+
+  --ease: cubic-bezier(0.3, 0.7, 0.2, 1);
+  --wrap: 1240px;
+  --gutter: clamp(16px, 4vw, 40px);
+  color-scheme: light;
+}
+
+/* Тёмная тема — своя палитра, а не инверсия */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #1b1915;
+    --paper-2: #24211b;
+    --surface: #2b2821;
+    --ink: #f1ebdd;
+    --ink-2: #bdb4a1;
+    --line: #050403;
+    --shadow-c: #050403;
+    --teal: #1fc4bd;
+    --yellow: #f5c52e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --paper: #1b1915;
+  --paper-2: #24211b;
+  --surface: #2b2821;
+  --ink: #f1ebdd;
+  --ink-2: #bdb4a1;
+  --line: #050403;
+  --shadow-c: #050403;
+  --teal: #1fc4bd;
+  --yellow: #f5c52e;
+  color-scheme: dark;
+}
+
+/* ---------- База ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 96px;
+}
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: var(--s0);
+  line-height: 1.55;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+main {
+  flex: 1;
+}
+img {
+  max-width: 100%;
+  display: block;
+}
+a {
+  color: inherit;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+a:hover {
+  text-decoration-color: var(--teal);
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--f-display);
+  line-height: 1.12;
+  margin: 0;
+  letter-spacing: 0;
+}
+h1 {
+  font-weight: 800;
+  font-size: clamp(1.8rem, 5.2vw, var(--s6));
+  hyphens: auto;
+  letter-spacing: -0.012em;
+}
+h2 {
+  font-weight: 700;
+  font-size: clamp(var(--s2), 3vw, var(--s3));
+}
+h3 {
+  font-weight: 650;
+  font-size: var(--s1);
+}
+p {
+  margin: 0 0 1em;
+}
+:focus-visible {
+  outline: 3px solid var(--teal);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+::selection {
+  background: var(--yellow);
+  color: #15130f;
+}
+.wrap {
+  width: 100%;
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+[hidden] {
+  display: none !important;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.mono {
+  font-family: var(--f-mono);
+}
+.label {
+  font-family: var(--f-mono);
+  font-size: var(--s-1);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.muted {
+  color: var(--ink-2);
+}
+
+/* ---------- Иконки (SVG как маска → любой цвет) ---------- */
+.ico {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--src) center / contain no-repeat;
+  mask: var(--src) center / contain no-repeat;
+  vertical-align: -0.18em;
+}
+
+/* ---------- Кнопки ---------- */
+.btn {
+  --bg: var(--surface);
+  --fg: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55em;
+  padding: 0.7em 1.15em;
+  font: 700 var(--s0) / 1 var(--f-body);
+  color: var(--fg);
+  background: var(--bg);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-btn);
+  box-shadow: var(--sh-sm);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    transform 0.12s var(--ease),
+    box-shadow 0.12s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--shadow-c);
+}
+.btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--shadow-c);
+}
+.btn--primary {
+  --bg: var(--teal);
+  --fg: #0d0c0a;
+}
+.btn--yellow {
+  --bg: var(--yellow);
+  --fg: #0d0c0a;
+}
+.btn--ink {
+  --bg: var(--ink);
+  --fg: var(--paper);
+}
+.btn--big {
+  font-size: var(--s1);
+  padding: 0.75em 1.2em;
+  font-family: var(--f-display);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.btn--sm {
+  font-size: var(--s-1);
+  padding: 0.5em 0.75em;
+  box-shadow: 2px 2px 0 var(--shadow-c);
+}
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Ссылка-стрелка: второстепенное действие */
+.link-more {
+  font-family: var(--f-mono);
+  font-weight: 700;
+  font-size: var(--s-1);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  border-bottom: var(--bw-thin) solid currentColor;
+  padding-bottom: 2px;
+}
+.link-more:hover {
+  background: var(--yellow);
+  color: #15130f;
+}
+
+/* ---------- Метки ---------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.28em 0.6em;
+  font-family: var(--f-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--bw-thin) solid var(--line);
+  border-radius: var(--r-tag);
+  white-space: nowrap;
+  text-decoration: none;
+}
+a.tag:hover {
+  box-shadow: 2px 2px 0 var(--shadow-c);
+  transform: translate(-1px, -1px);
+}
+.tag--manual {
+  background: var(--t-manual);
+  color: #15130f;
+}
+.tag--port {
+  background: var(--ink);
+  color: var(--paper);
+}
+.tag--ai-edited {
+  background: var(--t-ai-edited);
+  color: #15130f;
+}
+.tag--ai {
+  background: var(--t-ai);
+  color: #15130f;
+}
+.tag--wasted {
+  background: var(--t-wasted);
+  color: #fff;
+}
+.tag--plat {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--line);
+}
+.tag--big {
+  font-size: 0.92rem;
+  padding: 0.4em 0.75em;
+}
+
+/* ---------- Рекомендация: чёрная плашка со шкалой из 4 квадратов ---------- */
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  padding: 0.3em 0.65em 0.3em 0.5em;
+  font-family: var(--f-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #f2ede1;
+  background: #15130f;
+  border: var(--bw-thin) solid #15130f;
+  border-radius: var(--r-tag);
+  white-space: nowrap;
+  text-decoration: none;
+}
+:root[data-theme='dark'] .verdict {
+  border-color: #f2ede1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .verdict {
+    border-color: #f2ede1;
+  }
+}
+a.verdict:hover {
+  box-shadow: 2px 2px 0 var(--teal);
+  transform: translate(-1px, -1px);
+}
+.verdict--big {
+  font-size: 0.92rem;
+  padding: 0.42em 0.8em 0.42em 0.6em;
+}
+.vmeter {
+  --vc: var(--yellow);
+  display: inline-flex;
+  gap: 2px;
+}
+.vmeter i {
+  width: 0.62em;
+  height: 0.62em;
+  border: 1.5px solid currentColor;
+  opacity: 0.45;
+}
+.vmeter i.on {
+  background: var(--vc);
+  border-color: var(--vc);
+  opacity: 1;
+}
+.vmeter--great {
+  --vc: var(--green);
+}
+.vmeter--good {
+  --vc: var(--teal);
+}
+.vmeter--ok {
+  --vc: var(--yellow);
+}
+.vmeter--no {
+  --vc: var(--red);
+}
+/* «Не проверено»: четыре пустых серых квадратика */
+.vmeter--untested i {
+  border-color: #8b8476;
+  background: transparent;
+  opacity: 1;
+}
+.verdict--untested {
+  color: #c9c2b2;
+}
+/* мини-шкала на карточках каталога */
+.gcard .vmeter,
+.vmeter[role='img'] {
+  padding: 0.32em 0.4em;
+  background: #15130f;
+  color: #f2ede1;
+  border-radius: var(--r-tag);
+  border: var(--bw-thin) solid var(--line);
+}
+.gcard .vmeter i,
+.vmeter[role='img'] i {
+  width: 0.55em;
+  height: 0.55em;
+}
+
+/* ---------- Состояние перевода: белая плашка с иконкой ---------- */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.28em 0.6em;
+  font-family: var(--f-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--bw-thin) solid var(--line);
+  border-radius: 999px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.status--big {
+  font-size: 0.92rem;
+  padding: 0.38em 0.8em;
+}
+.status--partial {
+  border-style: dashed;
+  background: var(--paper-2);
+}
+.status--wip {
+  border-style: dotted;
+  background: var(--paper-2);
+}
+.status--upd {
+  background: var(--sky);
+  color: #15130f;
+}
+.status sup {
+  font-size: 0.9em;
+  line-height: 0;
+  margin-left: -0.15em;
+}
+a.status:hover {
+  box-shadow: 2px 2px 0 var(--shadow-c);
+}
+/* что не переведено — тонкие зачёркнутые «стикеры» */
+.gap {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22em 0.55em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  border: 1.5px dashed var(--ink-2);
+  border-radius: var(--r-tag);
+  white-space: nowrap;
+}
+.status-note {
+  flex-basis: 100%;
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+  color: var(--ink-2);
+}
+.status-note b {
+  color: var(--ink);
+}
+
+/* ---------- Ник модератора, поставившего рекомендацию ---------- */
+.modpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-left: 0.3em;
+  padding: 0.1em 0.6em 0.1em 0.45em;
+  font-family: var(--f-mono);
+  font-size: 0.78em;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+  vertical-align: 0.1em;
+}
+a.modpill:hover {
+  background: var(--yellow);
+  color: #15130f;
+}
+.modpill .ico {
+  width: 0.95em;
+  height: 0.95em;
+}
+
+/* ---------- Аватар ---------- */
+.avatar {
+  flex: none;
+  width: var(--size);
+  height: var(--size);
+  object-fit: cover;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-sm);
+  background: var(--paper-2);
+}
+.avatar--empty {
+  display: inline-grid;
+  place-items: center;
+  background: var(--bg);
+  color: #15130f;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: calc(var(--size) * 0.36);
+  line-height: 1;
+}
+
+/* ---------- Панели ---------- */
+.panel {
+  background: var(--surface);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-panel);
+  box-shadow: var(--sh);
+}
+/* Панель с «вкладкой»-ярлыком сверху */
+.note {
+  position: relative;
+  margin-top: 1.4rem;
+  padding: 0 1.3rem 1.1rem;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+/* ярлык сидит на верхней рамке, но остаётся в потоке — длинное имя просто перенесётся */
+.note > .note__tab {
+  position: relative;
+  top: -0.95rem;
+  left: -0.3rem;
+  display: inline-block;
+  max-width: calc(100% + 0.3rem);
+  margin-bottom: -0.35rem;
+  padding: 0.3rem 0.65rem;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: var(--r-tag);
+}
+.note__who {
+  color: inherit;
+  text-decoration-thickness: 1.5px;
+}
+.note p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- Поля ввода ---------- */
+.field {
+  width: 100%;
+  font: 500 var(--s0) / 1.3 var(--f-body);
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-btn);
+  padding: 0.7em 0.85em;
+  transition: box-shadow 0.12s var(--ease);
+}
+.field::placeholder {
+  color: var(--ink-2);
+  opacity: 0.8;
+}
+.field:focus {
+  outline: none;
+  box-shadow: var(--sh-sm);
+  border-color: var(--line);
+}
+.field:focus-visible {
+  outline: 3px solid var(--teal);
+  outline-offset: 2px;
+}
+textarea.field {
+  min-height: 7.5rem;
+  resize: vertical;
+}
+
+/* ---------- Сетки ---------- */
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: clamp(18px, 2.4vw, 28px);
+}
+
+/* Заголовок секции: слева текст, справа ссылка, под ними жирная линия */
+.sec-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  padding-bottom: 0.7rem;
+  border-bottom: var(--bw) solid var(--line);
+  margin-bottom: 1.6rem;
+}
+
+/* ---------- Типографика длинного текста ---------- */
+.prose {
+  max-width: 68ch;
+  font-size: 1.08rem;
+}
+.prose h2 {
+  font-size: var(--s2);
+  margin: 1.6em 0 0.6em;
+}
+.prose h3 {
+  margin: 1.4em 0 0.5em;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.3em;
+}
+.prose li {
+  margin-bottom: 0.35em;
+}
+.prose li::marker {
+  color: var(--ink-2);
+}
+.prose img {
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-card);
+  margin: 1.5em 0;
+}
+.prose blockquote {
+  margin: 1.5em 0;
+  padding: 0.6em 1.1em;
+  border-left: 6px solid var(--yellow);
+  background: var(--paper-2);
+}
+.prose code {
+  font-family: var(--f-mono);
+  font-size: 0.9em;
+  background: var(--paper-2);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

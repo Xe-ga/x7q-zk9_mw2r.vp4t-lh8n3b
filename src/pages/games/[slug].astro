@@ -1,0 +1,498 @@
+---
+import { render } from 'astro:content';
+import { getImage } from 'astro:assets';
+import Base from '../../layouts/Base.astro';
+import Cover from '../../components/Cover.astro';
+import TypeTag from '../../components/TypeTag.astro';
+import VerdictTag from '../../components/VerdictTag.astro';
+import StatusTag from '../../components/StatusTag.astro';
+import Icon from '../../components/Icon.astro';
+import Rating from '../../components/Rating.astro';
+import Comments from '../../components/Comments.astro';
+import { PLATFORM_BY_SLUG } from '../../data/platforms';
+import { TRANSLATION_TYPES, VERDICTS } from '../../data/taxonomy';
+import { getGames, getLookups, u, fmtDate, excerpt, rankedTranslations, verdictOf, host, plural } from '../../lib/util';
+
+export async function getStaticPaths() {
+  const games = await getGames();
+  return games.map((game) => ({ params: { slug: game.id }, props: { game } }));
+}
+
+const { game } = Astro.props;
+const d = game.data;
+const { Content } = await render(game);
+const { translators, publishers, moderators } = await getLookups();
+const platform = PLATFORM_BY_SLUG[d.platform];
+const publisher = d.publisher ? publishers[d.publisher.id] : null;
+const many = d.translations.length > 1;
+
+// Переводы — от лучшей рекомендации к худшей
+const trs = rankedTranslations(d.translations).map((t, idx) => {
+  const people = t.translators.map((x) => ({ id: x.id, ...translators[x.id] }));
+  const porters = t.porters.map((x) => ({ id: x.id, ...translators[x.id] }));
+  return {
+    ...t,
+    idx,
+    people,
+    porters,
+    names: people.map((p) => p.name).join(', ') || 'переводчик не указан',
+    mod: t.moderator ? { id: t.moderator.id, ...moderators[t.moderator.id] } : null,
+    src: host(t.sourceUrl),
+  };
+});
+const keys = trs.map((t) => t.key);
+const og = d.cover ? (await getImage({ src: d.cover, width: 600, format: 'jpg' })).src : undefined;
+const commentTargets = many
+  ? trs.map((t) => ({
+      key: t.key,
+      label: [t.port ? 'Порт' : '', TRANSLATION_TYPES[t.type].label, t.verdictLabel || VERDICTS[verdictOf(t)].label, t.names].filter(Boolean).join(' · '),
+    }))
+  : [];
+const one = trs[0];
+---
+<Base edit={`games/entries/${game.id}`} title={d.title} description={`${d.title} (${platform.short}) — русский перевод. ${excerpt(game.body, 140)}`} image={og}>
+  <div class="wrap game">
+    <nav class="crumbs label" aria-label="Навигация">
+      <a href={u('/search/')}>Каталог</a><span aria-hidden="true">/</span>
+      <a href={u(`/platforms/${platform.slug}/`)}>{platform.short}</a><span aria-hidden="true">/</span>
+      <span aria-current="page">{d.title}</span>
+    </nav>
+
+    <div class="game__grid">
+      <div class="game__cover">
+        <Cover cover={d.cover} title={d.title} platform={d.platform} widths={[320, 480, 640]} sizes="(max-width: 760px) 60vw, 300px" eager />
+      </div>
+
+      <div class="game__main">
+        <div class="game__tags">
+          {many ? (
+            <a class="game__count label" href="#translations">{trs.length} {plural(trs.length, ['перевод', 'перевода', 'переводов'])} — сравнить ↓</a>
+          ) : (
+            <>
+              {one.port && <span class="tag tag--port tag--big" title="Перенос готового перевода на другую версию игры">Порт</span>}
+              <TypeTag type={one.type} big link />
+              <VerdictTag verdict={one.verdict} label={one.verdictLabel} note={one.verdictNote} by={one.mod?.name} big link />
+              <StatusTag status={one.status} updating={one.updating} note={one.statusNote} big link />
+            </>
+          )}
+        </div>
+        <h1 class="game__title">{d.title}</h1>
+        {d.altTitles.length > 0 && <p class="game__alt mono">{d.altTitles.join(' · ')}</p>}
+
+        <dl class="passport">
+          <div><dt class="label">Платформа</dt><dd><a href={u(`/platforms/${platform.slug}/`)} class="passport__plat"><Icon name={platform.slug} platform />{platform.name}</a></dd></div>
+          {publisher && <div><dt class="label">Издатель</dt><dd><a href={u(`/search/?publisher=${d.publisher!.id}`)}>{publisher.name}</a></dd></div>}
+          {d.developer && <div><dt class="label">Разработчик</dt><dd>{d.developer}</dd></div>}
+          {d.year && <div><dt class="label">Год выхода</dt><dd>{d.year}</dd></div>}
+          {d.genres.length > 0 && (
+            <div><dt class="label">Жанр</dt><dd class="passport__genres">{d.genres.map((g) => <a class="tag" href={u(`/search/?genre=${encodeURIComponent(g)}`)}>{g}</a>)}</dd></div>
+          )}
+          <div><dt class="label">Обновлено</dt><dd>{fmtDate(d.date)}</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Главное на странице — переводы. Скачивание живёт внутри каждого перевода. -->
+    <section class="trs" id="translations" aria-labelledby="trs-h">
+      <div class="sec-head">
+        <h2 id="trs-h">{many ? <>Переводы <span class="trs__n mono">{trs.length}</span></> : 'Перевод'}</h2>
+        {many && <span class="label muted">от лучшего к худшему</span>}
+      </div>
+      {trs.map((t) => (
+        <article class="tcard" id={`t-${t.idx}`}>
+          <header class="tcard__head">
+            {t.port && <span class="tag tag--port tag--big" title="Перенос готового перевода на другую версию игры">Порт</span>}
+            <TypeTag type={t.type} big link />
+            <VerdictTag verdict={t.verdict} label={t.verdictLabel} note={t.verdictNote} by={t.mod?.name} big link />
+            {t.date && <span class="label muted tcard__date">добавлен {fmtDate(t.date)}</span>}
+          </header>
+          <p class="tcard__hint muted">
+            {t.verdictNote?.trim() ? <span class="tcard__why">{t.verdictNote.trim().replace(/\.$/, '')}.</span> : <>{VERDICTS[verdictOf(t)].hint}.</>}
+            {t.verdict && t.verdict !== 'untested' && t.mod && (
+              <a class="modpill" href={u(`/moderators/${t.mod.id}/`)} title={`Рекомендацию поставил модератор ${t.mod.name}`}><Icon name="user" />{t.mod.name}</a>
+            )}
+          </p>
+          <div class="tcard__state">
+            <StatusTag status={t.status} updating={t.updating} gaps={t.gaps} custom={t.gapsCustom} note={t.statusNote} showNote big link />
+          </div>
+          {t.port && (
+            <p class="tcard__port">
+              Порт{t.portFrom && <> {t.portFrom}</>}.
+              {t.originalUrl && <a href={t.originalUrl} rel="noopener" target="_blank">Оригинальный перевод <Icon name="external-link" /></a>}
+            </p>
+          )}
+          <p class="tcard__who">
+            <span class="label muted">{t.port ? 'Перевод оригинала' : t.people.length > 1 ? 'Переводчики' : 'Переводчик'}</span>
+            {t.people.length === 0 && <span class="muted">не указан</span>}
+            {t.people.map((p, i) => (
+              <span class="tcard__person">
+                <a href={u(`/translators/${p.id}/`)} title={`Страница переводчика ${p.name}: все переводы и отзывы`}>{p.name}</a>{i < t.people.length - 1 && ','}
+              </span>
+            ))}
+          </p>
+          {t.port && (
+            <p class="tcard__who">
+              <span class="label muted">{t.porters.length > 1 ? 'Портировщики' : 'Портировщик'}</span>
+              {t.porters.length === 0 && <span class="muted">не указан</span>}
+              {t.porters.map((p, i) => (
+                <span class="tcard__person">
+                  <a href={u(`/translators/${p.id}/`)} title={`Страница ${p.name}: все переводы и отзывы`}>{p.name}</a>{i < t.porters.length - 1 && ','}
+                </span>
+              ))}
+            </p>
+          )}
+
+          <div class="tcard__body">
+            <div class="tcard__notes">
+              {t.moderatorNote && (
+                <section class="note note--mod">
+                  <span class="note__tab label">Модератор{t.mod && <>: <a class="note__who" href={u(`/moderators/${t.mod.id}/`)} title={`Кто такой ${t.mod.name} и как проверяет переводы`}>{t.mod.name}</a></>}</span>
+                  <p>{t.moderatorNote}</p>
+                </section>
+              )}
+              {t.translatorNote && (
+                <section class="note note--tr">
+                  <span class="note__tab label">{t.port && t.porters[0] ? `От портировщика: ${t.porters[0].name}` : `От переводчика${t.people[0] ? `: ${t.people[0].name}` : ''}`}</span>
+                  <p>{t.translatorNote}</p>
+                </section>
+              )}
+              {!t.moderatorNote && !t.translatorNote && <p class="tcard__empty muted">Комментариев к этому переводу пока нет.</p>}
+            </div>
+
+            <div class="tcard__side">
+              <div class="dl">
+                {t.sourceUrl && (
+                  <a class="btn btn--primary dl__main" href={t.sourceUrl} rel="noopener" target="_blank">
+                    <Icon name="download" />Скачать у переводчика
+                  </a>
+                )}
+                {t.sourceUrl && t.src && <p class="dl__src mono">{t.src}</p>}
+                {t.download && (
+                  <a class="btn btn--ghost dl__tg" href={t.download} rel="noopener" target="_blank">
+                    <Icon name="external-link" />Скачать из Telegram-канала
+                  </a>
+                )}
+              </div>
+              <Rating gameId={game.id} tkey={t.key} allKeys={keys} />
+            </div>
+          </div>
+        </article>
+      ))}
+    </section>
+
+    <section class="about-game" aria-labelledby="desc-h">
+      <div class="sec-head"><h2 id="desc-h">Об игре</h2></div>
+      <div class="prose"><Content /></div>
+    </section>
+
+    <Comments gameId={game.id} keys={keys} targets={commentTargets} />
+  </div>
+</Base>
+
+<style>
+  .game {
+    padding-top: clamp(20px, 3vw, 36px);
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    color: var(--ink-2);
+    margin-bottom: clamp(20px, 3vw, 36px);
+  }
+  .crumbs a {
+    text-decoration: none;
+  }
+  .crumbs a:hover {
+    text-decoration: underline;
+  }
+  .crumbs [aria-current] {
+    color: var(--ink);
+  }
+  .game__grid {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: clamp(28px, 5vw, 64px);
+    align-items: start;
+  }
+  .game__cover {
+    aspect-ratio: 4 / 5;
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-lg);
+    overflow: hidden;
+    background: var(--paper-2);
+  }
+  .game__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    margin-bottom: 1rem;
+  }
+  .game__count {
+    text-decoration: none;
+    border-bottom: var(--bw-thin) solid currentColor;
+  }
+  .game__count:hover {
+    background: var(--yellow);
+    color: #15130f;
+  }
+  .game__title {
+    font-size: clamp(var(--s3), 4.6vw, var(--s5));
+    max-width: 18ch;
+    overflow-wrap: anywhere;
+  }
+  .game__alt {
+    margin: 0.7rem 0 0;
+    color: var(--ink-2);
+    font-size: 0.92rem;
+  }
+
+  .passport {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 1.8rem 0 0;
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .passport > div {
+    padding: 0.75rem 1rem;
+    border-bottom: var(--bw-thin) solid var(--line);
+    min-width: 0;
+  }
+  .passport > div:nth-child(odd) {
+    border-right: var(--bw-thin) solid var(--line);
+  }
+  .passport > div:nth-last-child(-n + 2):nth-child(odd),
+  .passport > div:last-child {
+    border-bottom: 0;
+  }
+  .passport > div:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    border-right: 0;
+  }
+  .passport dt {
+    color: var(--ink-2);
+    margin-bottom: 0.2rem;
+    font-size: 0.72rem;
+  }
+  .passport dd {
+    margin: 0;
+    font-weight: 600;
+  }
+  .passport__plat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+  }
+  .passport__plat :global(.ico) {
+    width: 1.6em;
+    height: 1.4em;
+  }
+  .passport__genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* ---------- Переводы ---------- */
+  .trs {
+    margin-top: clamp(40px, 6vw, 72px);
+  }
+  .trs__n {
+    font-size: 0.55em;
+    vertical-align: 0.4em;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0.05em 0.4em;
+    border-radius: 3px;
+  }
+  .tcard {
+    padding: clamp(16px, 2.4vw, 28px);
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-panel);
+    box-shadow: var(--sh);
+    scroll-margin-top: 96px;
+  }
+  .tcard + .tcard {
+    margin-top: 28px;
+  }
+  .tcard:target {
+    outline: 3px solid var(--teal);
+    outline-offset: 4px;
+  }
+  .tcard__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+  }
+  .tcard__date {
+    margin-left: auto;
+  }
+  .tcard__state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .tcard__hint {
+    margin: 0.7rem 0 0;
+    font-size: 0.95rem;
+  }
+  .tcard__why {
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .tcard__port {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.3em 0.8em;
+    margin: 0.9rem 0 0;
+    padding: 0.55rem 0.8rem;
+    background: var(--paper);
+    border-left: 4px solid var(--ink);
+    font-weight: 600;
+  }
+  .tcard__port a {
+    font-weight: 600;
+  }
+  .tcard__who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4em 0.7em;
+    margin: 0.9rem 0 0;
+    font-weight: 600;
+  }
+  .tcard__person {
+    overflow-wrap: anywhere;
+  }
+  .tcard__all {
+    font-family: var(--f-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-left: 0.35em;
+    padding: 0.05em 0.35em;
+    border: 1.5px solid var(--ink-2);
+    border-radius: 3px;
+    color: var(--ink-2);
+    text-decoration: none;
+    vertical-align: 0.1em;
+  }
+  .tcard__all:hover {
+    background: var(--yellow);
+    color: #15130f;
+    border-color: var(--line);
+  }
+  .tcard__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: clamp(20px, 3.5vw, 48px);
+    align-items: start;
+    margin-top: 1.2rem;
+    padding-top: 1.2rem;
+    border-top: var(--bw-thin) dashed var(--ink-2);
+  }
+  .tcard__notes .note:first-child {
+    margin-top: 0.95rem;
+  }
+  .tcard__notes .note + .note {
+    margin-top: 1.9rem;
+  }
+  .tcard__empty {
+    margin: 0;
+  }
+  .tcard__side {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .note--mod {
+    background: var(--yellow);
+    color: #15130f;
+  }
+  .note--mod .note__tab {
+    background: #15130f;
+    color: var(--yellow);
+  }
+  .note--tr {
+    background: var(--paper);
+  }
+  .note--tr .note__tab {
+    background: var(--teal);
+    color: #15130f;
+    border: var(--bw-thin) solid var(--line);
+  }
+
+  /* ---------- Скачивание внутри перевода ---------- */
+  .dl {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .dl__main,
+  .dl__tg {
+    width: 100%;
+  }
+  .dl__src {
+    margin: -2px 0 2px;
+    font-size: 0.75rem;
+    color: var(--ink-2);
+    text-align: center;
+  }
+  /* Второстепенная кнопка: тише основной */
+  .btn--ghost {
+    --bg: transparent;
+    --fg: var(--ink-2);
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0.6em 0.9em;
+    border-width: var(--bw-thin);
+    border-color: var(--ink-2);
+    box-shadow: none;
+  }
+  .btn--ghost:hover {
+    --fg: var(--ink);
+    --bg: var(--surface);
+    border-color: var(--line);
+    box-shadow: 2px 2px 0 var(--shadow-c);
+  }
+
+  .about-game {
+    margin-top: clamp(48px, 6vw, 80px);
+  }
+
+  @media (max-width: 860px) {
+    .tcard__body {
+      grid-template-columns: 1fr;
+    }
+    .tcard__date {
+      margin-left: 0;
+    }
+  }
+  @media (max-width: 760px) {
+    .game__grid {
+      grid-template-columns: 1fr;
+    }
+    .game__cover {
+      max-width: 260px;
+    }
+    .passport {
+      grid-template-columns: 1fr;
+    }
+    .passport > div:nth-child(odd) {
+      border-right: 0;
+    }
+    .passport > div:nth-last-child(-n + 2):nth-child(odd) {
+      border-bottom: var(--bw-thin) solid var(--line);
+    }
+  }
+</style>

@@ -1,0 +1,211 @@
+---
+// Страница модератора: кто он, как проверяет переводы и что уже проверил.
+// В меню ссылки нет — сюда попадают по имени модератора на странице игры.
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Avatar from '../../components/Avatar.astro';
+import Cover from '../../components/Cover.astro';
+import TypeTag from '../../components/TypeTag.astro';
+import VerdictTag from '../../components/VerdictTag.astro';
+import Icon from '../../components/Icon.astro';
+import { PLATFORM_BY_SLUG } from '../../data/platforms';
+import { VERDICT_KEYS } from '../../data/taxonomy';
+import { getGames, u, plural, host, verdictOf } from '../../lib/util';
+
+export async function getStaticPaths() {
+  const mods = await getCollection('moderators');
+  return mods.map((mod) => ({ params: { id: mod.id }, props: { mod } }));
+}
+const { mod } = Astro.props;
+const { Content } = await render(mod);
+const games = await getGames();
+const checked = games.flatMap((game) => game.data.translations.filter((t) => t.moderator?.id === mod.id).map((t) => ({ game, t })));
+const byVerdict = Object.fromEntries(VERDICT_KEYS.map((k) => [k, checked.filter((c) => verdictOf(c.t) === k).length]));
+const n = checked.length;
+---
+<Base edit={`moderators/entries/${mod.id}`} title={`Модератор ${mod.data.name}`} description={mod.data.tagline ?? `Модератор архива ${mod.data.name}.`}>
+  <div class="wrap modp">
+    <header class="modp__head">
+      <Avatar image={mod.data.avatar} name={mod.data.name} size={120} />
+      <div class="modp__who">
+        <p class="label muted">Модератор</p>
+        <h1 class="modp__name">{mod.data.name}</h1>
+        {mod.data.tagline && <p class="modp__tag">{mod.data.tagline}</p>}
+        <p class="mono muted modp__n">Проверил {n} {plural(n, ['перевод', 'перевода', 'переводов'])}</p>
+        {mod.data.url && (
+          <a class="btn btn--sm" href={mod.data.url} rel="noopener" target="_blank"><Icon name="external-link" />{host(mod.data.url) || 'Ссылка'}</a>
+        )}
+      </div>
+    </header>
+
+    <div class="modp__grid">
+      <section aria-labelledby="about-h">
+        <h2 id="about-h" class="label modp__h">О себе и о том, как проверяю</h2>
+        {mod.body?.trim() ? <div class="prose"><Content /></div> : <p class="muted">Модератор пока ничего о себе не написал.</p>}
+      </section>
+
+      {n > 0 && (
+        <aside class="panel modp__dist" aria-label="Какие рекомендации ставит">
+          <h2 class="label modp__h">Какие рекомендации ставит</h2>
+          <ul>
+            {VERDICT_KEYS.filter((k) => byVerdict[k]).map((k) => (
+              <li><VerdictTag verdict={k} /><b class="mono">{byVerdict[k]}</b></li>
+            ))}
+          </ul>
+        </aside>
+      )}
+    </div>
+
+    {n > 0 && (
+      <section class="modp__works" aria-labelledby="checked-h">
+        <div class="sec-head"><h2 id="checked-h">Проверенные переводы</h2></div>
+        <ul class="works">
+          {checked.map(({ game, t }) => (
+            <li>
+              <a class="work" href={u(`/games/${game.id}/#translations`)}>
+                <span class="work__cover"><Cover cover={game.data.cover} title={game.data.title} platform={game.data.platform} widths={[120, 200]} sizes="84px" /></span>
+                <span class="work__body">
+                  <span class="work__title">{game.data.title}</span>
+                  <span class="work__meta mono">{PLATFORM_BY_SLUG[game.data.platform].short}{game.data.year && ` · ${game.data.year}`}</span>
+                  <span class="work__tags">
+                    {t.port && <span class="tag tag--port">Порт</span>}
+                    <TypeTag type={t.type} />
+                    <VerdictTag verdict={t.verdict} label={t.verdictLabel} note={t.verdictNote} />
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </div>
+</Base>
+<style>
+  .modp {
+    padding-top: clamp(28px, 4vw, 52px);
+  }
+  .modp__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: clamp(16px, 3vw, 32px);
+    padding-bottom: 1.8rem;
+    border-bottom: var(--bw) solid var(--line);
+  }
+  .modp__who {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+  .modp__name {
+    overflow-wrap: anywhere;
+  }
+  .modp__tag {
+    font-size: var(--s1);
+    margin: 0.2rem 0 0;
+  }
+  .modp__n {
+    margin: 0 0 0.4rem;
+    font-size: 0.88rem;
+  }
+  .modp__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: clamp(24px, 4vw, 56px);
+    align-items: start;
+    margin-top: 2rem;
+  }
+  .modp__h {
+    display: block;
+    font-size: var(--s-1);
+    margin-bottom: 1rem;
+    color: var(--ink-2);
+  }
+  .modp__dist {
+    padding: 1.1rem 1.2rem;
+    box-shadow: var(--sh-sm);
+  }
+  .modp__dist ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .modp__dist li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modp__works {
+    margin-top: clamp(40px, 5vw, 64px);
+  }
+  .works {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+    gap: 16px;
+  }
+  .work {
+    display: flex;
+    gap: 14px;
+    height: 100%;
+    padding: 10px;
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-sm);
+    text-decoration: none;
+    transition:
+      transform 0.12s var(--ease),
+      box-shadow 0.12s var(--ease);
+  }
+  .work:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--sh);
+  }
+  .work__cover {
+    flex: none;
+    width: 84px;
+    aspect-ratio: 4 / 5;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+    overflow: hidden;
+  }
+  .work__cover :global(.cover-fallback__title),
+  .work__cover :global(.cover-fallback__plat) {
+    display: none;
+  }
+  .work__body {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  .work__title {
+    font-family: var(--f-display);
+    font-weight: 650;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  .work__meta {
+    font-size: 0.78rem;
+    color: var(--ink-2);
+  }
+  .work__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+  }
+  @media (max-width: 860px) {
+    .modp__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

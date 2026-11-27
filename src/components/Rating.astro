@@ -1,0 +1,212 @@
+---
+import Icon from './Icon.astro';
+interface Props { gameId: string; tkey: string; allKeys: string[]; title?: string; ask?: string }
+const {
+  gameId,
+  tkey,
+  allKeys,
+  title = 'Оценка перевода',
+  ask = 'Оценивайте качество <b>перевода</b>, а не саму игру.',
+} = Astro.props;
+const opts = [
+  { v: 1, slot: 'up', icon: 'thumbsup', label: 'Хорошо', cls: 'up' },
+  { v: 0, slot: 'mid', icon: 'face-thinking', label: 'Средне', cls: 'mid' },
+  { v: -1, slot: 'down', icon: 'thumbsdown', label: 'Плохо', cls: 'down' },
+];
+---
+<section class="rate" data-game={gameId} data-key={tkey} data-keys={JSON.stringify(allKeys)} aria-label={title}>
+  <div class="rate__head">
+    <h3 class="label">{title}</h3>
+    <span class="rate__total label muted" data-total>…</span>
+  </div>
+  <div class="rate__btns" role="group" aria-label={`Ваша оценка: ${title.toLowerCase()}`}>
+    {opts.map((o) => (
+      <button type="button" class={`rate__btn rate__btn--${o.cls}`} data-v={o.v} aria-pressed="false" disabled>
+        <span class="rate__icons">
+          <Icon name={o.icon} class="rate__off" /><Icon name={`${o.icon}-solid`} class="rate__on" />
+        </span>
+        <span class="rate__n" data-n={o.slot}>0</span>
+        <span class="rate__lbl">{o.label}</span>
+      </button>
+    ))}
+  </div>
+  <div class="rate__bar" aria-hidden="true">
+    <i class="up" data-bar="up"></i><i class="mid" data-bar="mid"></i><i class="down" data-bar="down"></i>
+  </div>
+  <p class="rate__ask" set:html={ask} />
+  <p class="rate__hint muted" data-hint aria-live="polite"></p>
+</section>
+
+<script>
+  import { loadGame, rateTranslation, errorText, type Counts, type Vote } from '../scripts/backend';
+  import { plural } from '../scripts/plural';
+
+  for (const box of document.querySelectorAll<HTMLElement>('.rate')) {
+    const game = box.dataset.game!;
+    const key = box.dataset.key!;
+    const keys: string[] = JSON.parse(box.dataset.keys || '[]');
+    const btns = [...box.querySelectorAll<HTMLButtonElement>('.rate__btn')];
+    const hint = box.querySelector<HTMLElement>('[data-hint]')!;
+    let busy = false;
+
+    const paint = (r: Counts, mine: Vote | null) => {
+      const total = r.up + r.mid + r.down;
+      box.querySelector('[data-total]')!.textContent = `${total} ${plural(total, ['голос', 'голоса', 'голосов'])}`;
+      for (const k of ['up', 'mid', 'down'] as const) {
+        box.querySelector(`[data-n="${k}"]`)!.textContent = String(r[k]);
+        (box.querySelector(`[data-bar="${k}"]`) as HTMLElement).style.flexGrow = String(total ? r[k] : 1);
+      }
+      box.classList.toggle('is-empty', total === 0);
+      for (const b of btns) b.setAttribute('aria-pressed', String(mine !== null && Number(b.dataset.v) === mine));
+    };
+
+    loadGame(game, keys)
+      .then((d) => {
+        paint(d.ratings[key], d.mine[key]);
+        btns.forEach((b) => (b.disabled = false));
+      })
+      .catch((e) => (hint.textContent = errorText(e)));
+
+    for (const b of btns) {
+      b.addEventListener('click', async () => {
+        if (busy) return;
+        busy = true;
+        const v = Number(b.dataset.v) as Vote;
+        const next = b.getAttribute('aria-pressed') === 'true' ? null : v;
+        try {
+          const r = await rateTranslation(game, key, next);
+          paint(r.ratings, r.my_rating);
+          hint.textContent = next === null ? 'Голос отменён.' : 'Спасибо! Нажмите ещё раз, чтобы отменить.';
+        } catch (e) {
+          hint.textContent = errorText(e);
+        } finally {
+          busy = false;
+        }
+      });
+    }
+  }
+</script>
+
+<style>
+  .rate__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.7rem;
+  }
+  .rate__head h3 {
+    font-size: var(--s-1);
+    letter-spacing: 0.06em;
+  }
+  .rate__btns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .rate__btn {
+    --c: var(--teal);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 4px 8px;
+    color: var(--ink);
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-btn);
+    box-shadow: var(--sh-sm);
+    cursor: pointer;
+    font: inherit;
+    transition:
+      transform 0.1s var(--ease),
+      box-shadow 0.1s var(--ease),
+      background 0.1s;
+  }
+  .rate__btn--mid {
+    --c: var(--yellow);
+  }
+  .rate__btn--down {
+    --c: var(--magenta);
+  }
+  .rate__btn:hover:not([disabled]) {
+    background: color-mix(in srgb, var(--c) 30%, var(--surface));
+  }
+  .rate__btn:active:not([disabled]) {
+    transform: translate(3px, 3px);
+    box-shadow: none;
+  }
+  .rate__btn[aria-pressed='true'] {
+    background: var(--c);
+    color: #15130f;
+    transform: translate(3px, 3px);
+    box-shadow: none;
+  }
+  .rate__btn[disabled] {
+    cursor: wait;
+    opacity: 0.6;
+  }
+  .rate__icons :global(.ico) {
+    width: 28px;
+    height: 28px;
+  }
+  :global(.rate__on) {
+    display: none !important;
+  }
+  .rate__btn[aria-pressed='true'] :global(.rate__on) {
+    display: inline-block !important;
+  }
+  .rate__btn[aria-pressed='true'] :global(.rate__off) {
+    display: none;
+  }
+  .rate__n {
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: 1.35rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .rate__lbl {
+    font-family: var(--f-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .rate__bar {
+    display: flex;
+    height: 12px;
+    margin-top: 14px;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--paper-2);
+  }
+  .rate__bar i {
+    flex: 1 1 0;
+    transition: flex-grow 0.3s var(--ease);
+  }
+  .rate__bar i + i {
+    border-left: var(--bw-thin) solid var(--line);
+  }
+  .rate__bar .up {
+    background: var(--teal);
+  }
+  .rate__bar .mid {
+    background: var(--yellow);
+  }
+  .rate__bar .down {
+    background: var(--magenta);
+  }
+  .rate.is-empty .rate__bar i {
+    background: var(--paper-2);
+  }
+  .rate__ask {
+    font-size: 0.86rem;
+    margin: 0.65rem 0 0;
+  }
+  .rate__hint {
+    font-size: 0.82rem;
+    margin: 0.2rem 0 0;
+    min-height: 1.2em;
+  }
+</style>

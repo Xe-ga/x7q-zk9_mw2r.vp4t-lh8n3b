@@ -1,0 +1,480 @@
+---
+import Base from '../layouts/Base.astro';
+import GameCard from '../components/GameCard.astro';
+import Cover from '../components/Cover.astro';
+import TypeTag from '../components/TypeTag.astro';
+import VerdictTag from '../components/VerdictTag.astro';
+import Icon from '../components/Icon.astro';
+import { PLATFORMS, PLATFORM_BY_SLUG } from '../data/platforms';
+import { TRANSLATION_TYPE_KEYS } from '../data/taxonomy';
+import { getGames, getPosts, getLookups, u, fmtDate, fmtShort, excerpt, rankedTranslations } from '../lib/util';
+
+const games = await getGames();
+const posts = (await getPosts()).slice(0, 3);
+const { publishers, translators } = await getLookups();
+
+const counts: Record<string, number> = {};
+for (const g of games) counts[g.data.platform] = (counts[g.data.platform] ?? 0) + 1;
+const shelf = PLATFORMS; // порядок по компаниям задан в src/data/platforms.ts
+const usedPlatforms = PLATFORMS.filter((p) => counts[p.slug]).length;
+
+const [featured, ...rest] = games;
+const latest = rest.slice(0, 8);
+const updated = games[0]?.data.date;
+const featBest = featured ? rankedTranslations(featured.data.translations)[0] : null;
+const featNames = featured ? [...new Set(featured.data.translations.flatMap((t) => t.translators.map((x) => translators[x.id]?.name)))] : [];
+const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.data.publisher.id]?.name : undefined);
+---
+<Base>
+  <section class="hero wrap">
+    <div class="hero__main">
+      {updated && <p class="label muted hero__kicker">Обновлено {fmtDate(updated)}</p>}
+      <h1>Русские переводы<br /><span class="hero__hl">ретро-игр</span></h1>
+      <p class="hero__lead">Архив русских переводов ретро-игр.</p>
+      <form class="hero__search" action={u('/search/')} method="get" role="search">
+        <label for="hero-q" class="sr-only">Название игры</label>
+        <input id="hero-q" class="field" type="search" name="q" placeholder="Например: Snatcher или «снатчер»" autocomplete="off" />
+        <button class="btn btn--primary" type="submit"><Icon name="search" />Найти</button>
+      </form>
+      <div class="hero__types">
+        <span class="label muted">Перевод:</span>
+        {TRANSLATION_TYPE_KEYS.map((t) => <TypeTag type={t} link />)}
+      </div>
+      <a class="send" href={u('/submit/')}>
+        <span class="send__ico"><Icon name="upload" /></span>
+        <span class="send__text">
+          <b>Сделали перевод?</b>
+          <span>Отправьте его нам — модераторы проверят и добавят в архив.</span>
+        </span>
+        <span class="send__go" aria-hidden="true">→</span>
+      </a>
+    </div>
+
+    <aside class="shelf panel" aria-labelledby="shelf-h">
+      <div class="shelf__head">
+        <h2 id="shelf-h" class="label">Платформы</h2>
+        <a class="shelf__all label" href={u('/platforms/')}>все</a>
+      </div>
+      <ul class="shelf__grid">
+        {shelf.map((p) => (
+          <li>
+            <a class:list={['shelf__item', { 'is-empty': !counts[p.slug] }]} href={u(`/platforms/${p.slug}/`)} title={p.name}>
+              <Icon name={p.slug} platform class="shelf__ico" />
+              <span class="shelf__name">{p.short}</span>
+              <span class="shelf__count">{counts[p.slug] ?? 0}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  </section>
+
+  {featured && (
+    <section class="wrap latest" aria-labelledby="latest-h">
+      <div class="sec-head">
+        <h2 id="latest-h">Свежие переводы</h2>
+        <a class="link-more" href={u('/search/?sort=new')}>Весь каталог · {games.length}</a>
+      </div>
+
+      <article class="feat">
+        <a class="feat__cover" href={u(`/games/${featured.id}/`)} tabindex="-1" aria-hidden="true">
+          <Cover cover={featured.data.cover} title={featured.data.title} platform={featured.data.platform} widths={[360, 560]} sizes="(max-width: 760px) 100vw, 340px" eager />
+        </a>
+        <div class="feat__body">
+          <div class="feat__tags">
+            <span class="tag tag--plat"><Icon name={featured.data.platform} platform />{PLATFORM_BY_SLUG[featured.data.platform].short}</span>
+            {featBest && <TypeTag type={featBest.type} />}
+            {featBest && <VerdictTag verdict={featBest.verdict} label={featBest.verdictLabel} note={featBest.verdictNote} />}
+            {featured.data.translations.length > 1 && <span class="label muted">+{featured.data.translations.length - 1} перевод</span>}
+            <span class="label muted">{fmtShort(featured.data.date)}</span>
+          </div>
+          <h3 class="feat__title"><a href={u(`/games/${featured.id}/`)}>{featured.data.title}</a></h3>
+          <p class="feat__meta mono">
+            {[featured.data.year, pubName(featured)].filter(Boolean).join(' · ')}
+            {featNames.length > 0 && <> · перевод: {featNames.join(', ')}</>}
+          </p>
+          <p class="feat__text">{excerpt(featured.body, 260)}</p>
+          <a class="btn btn--ink" href={u(`/games/${featured.id}/`)}>Открыть страницу игры</a>
+        </div>
+      </article>
+
+      <div class="grid-cards latest__grid">
+        {latest.map((g) => <GameCard game={g} publisherName={pubName(g)} />)}
+      </div>
+    </section>
+  )}
+
+  <section class="wrap home-split">
+    <div class="home-blog">
+      <div class="sec-head">
+        <h2>Блог</h2>
+        <a class="link-more" href={u('/blog/')}>Все записи</a>
+      </div>
+      <ol class="post-list">
+        {posts.map((p) => (
+          <li>
+            <a href={u(`/blog/${p.id}/`)} class="post-row">
+              <time class="label muted" datetime={p.data.date.toISOString()}>{fmtShort(p.data.date)}</time>
+              <span class="post-row__title">{p.data.title}</span>
+              {p.data.excerpt && <span class="post-row__ex">{p.data.excerpt}</span>}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </div>
+    <div class="dice panel">
+      <p class="label">Не знаете, во что сыграть?</p>
+      <p class="dice__text">Случайная игра из архива. Кроме «потраченных» — их мы не советуем.</p>
+      <button class="btn btn--yellow btn--big" id="dice" type="button"
+        data-games={JSON.stringify(games.filter((g) => g.data.translations.some((t) => t.type !== 'wasted')).map((g) => u(`/games/${g.id}/`)))}>
+        <Icon name="shuffle" />Мне повезёт
+      </button>
+    </div>
+  </section>
+</Base>
+
+<script>
+  const b = document.getElementById('dice');
+  b?.addEventListener('click', () => {
+    const list: string[] = JSON.parse(b.dataset.games || '[]');
+    if (list.length) location.href = list[Math.floor(Math.random() * list.length)];
+  });
+</script>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: clamp(28px, 5vw, 64px);
+    align-items: start;
+    padding-block: clamp(36px, 6vw, 84px) clamp(48px, 6vw, 80px);
+  }
+  .hero__kicker {
+    margin-bottom: 1rem;
+  }
+  .hero h1 {
+    max-width: 13ch;
+  }
+  .hero__hl {
+    display: inline-block;
+    background: var(--teal);
+    color: #15130f;
+    border: var(--bw) solid var(--line);
+    box-shadow: var(--sh);
+    padding: 0 0.18em 0.06em;
+    margin-top: 0.12em;
+    transform: rotate(-1.5deg);
+  }
+  .hero__lead {
+    max-width: 46ch;
+    font-size: var(--s1);
+    line-height: 1.45;
+    margin: 1.6rem 0 1.6rem;
+  }
+  .hero__search {
+    display: flex;
+    gap: 10px;
+    max-width: 560px;
+  }
+  .hero__search .field {
+    font-size: 1.08rem;
+    box-shadow: var(--sh-sm);
+  }
+  .hero__search .btn {
+    flex: none;
+  }
+  .hero__types {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 1.25rem;
+  }
+
+  .send {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: 560px;
+    margin-top: 1.8rem;
+    padding: 12px 16px 12px 12px;
+    background: var(--surface);
+    border: var(--bw) dashed var(--line);
+    border-radius: var(--r-card);
+    text-decoration: none;
+    transition:
+      transform 0.12s var(--ease),
+      box-shadow 0.12s var(--ease),
+      border-style 0s;
+  }
+  .send:hover {
+    border-style: solid;
+    transform: translate(-2px, -2px);
+    box-shadow: var(--sh);
+  }
+  .send__ico {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 46px;
+    height: 46px;
+    background: var(--magenta);
+    color: #15130f;
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-btn);
+    font-size: 1.4rem;
+  }
+  .send__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.3;
+  }
+  .send__text b {
+    font-family: var(--f-display);
+    font-weight: 700;
+  }
+  .send__text span {
+    color: var(--ink-2);
+    font-size: 0.94rem;
+  }
+  .send__go {
+    margin-left: auto;
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: 1.4rem;
+  }
+  .shelf {
+    padding: 0;
+    overflow: hidden;
+    transform: rotate(1deg);
+    margin-top: 8px;
+  }
+  .shelf__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 1rem;
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .shelf__head h2 {
+    font-size: var(--s-1);
+    letter-spacing: 0.08em;
+  }
+  .shelf__all {
+    color: var(--yellow);
+    text-decoration: none;
+  }
+  .shelf__all:hover {
+    text-decoration: underline;
+  }
+  .shelf__grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .shelf__grid li {
+    border-right: var(--bw-thin) solid var(--line);
+    border-bottom: var(--bw-thin) solid var(--line);
+  }
+  .shelf__grid li:nth-child(4n) {
+    border-right: 0;
+  }
+  .shelf__grid li:nth-last-child(-n + 4) {
+    border-bottom: 0;
+  }
+  .shelf__item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 6px 10px;
+    text-decoration: none;
+    transition: background 0.12s var(--ease);
+  }
+  .shelf__item:hover {
+    background: var(--yellow);
+    color: #15130f;
+  }
+  .shelf__item :global(.shelf__ico) {
+    width: 58px;
+    height: 46px;
+    margin: -6px 0 -4px;
+  }
+  .shelf__name {
+    font-family: var(--f-mono);
+    font-weight: 700;
+    font-size: 0.78rem;
+  }
+  .shelf__count {
+    position: absolute;
+    top: 5px;
+    right: 6px;
+    font-family: var(--f-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 1.5em;
+    text-align: center;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 3px;
+    padding: 0 3px;
+  }
+  .shelf__item.is-empty {
+    color: var(--ink-2);
+  }
+  .shelf__item.is-empty :global(.shelf__ico) {
+    opacity: 0.45;
+  }
+  .shelf__item.is-empty .shelf__count {
+    background: transparent;
+    color: var(--ink-2);
+  }
+
+  /* Главная новинка — крупно и горизонтально */
+  .feat {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-panel);
+    box-shadow: var(--sh-lg);
+    overflow: hidden;
+    margin-bottom: clamp(28px, 4vw, 44px);
+  }
+  .feat__cover {
+    display: block;
+    border-right: var(--bw) solid var(--line);
+    aspect-ratio: 4 / 5;
+    background: var(--paper-2);
+  }
+  .feat__body {
+    padding: clamp(20px, 3vw, 36px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.9rem;
+  }
+  .feat__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .feat__title {
+    font-size: clamp(var(--s2), 3.4vw, var(--s4));
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+  .feat__title a {
+    text-decoration: none;
+  }
+  .feat__title a:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--teal);
+    text-decoration-thickness: 4px;
+  }
+  .feat__meta {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--ink-2);
+  }
+  .feat__text {
+    max-width: 60ch;
+    margin: 0 0 0.4rem;
+  }
+
+  .home-split {
+    display: grid;
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    gap: clamp(28px, 4vw, 56px);
+    margin-top: clamp(56px, 7vw, 96px);
+    align-items: start;
+  }
+  .post-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .post-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    column-gap: 18px;
+    padding: 1rem 0;
+    border-bottom: var(--bw-thin) dashed var(--ink-2);
+    text-decoration: none;
+  }
+  .post-row time {
+    padding-top: 0.3em;
+  }
+  .post-row__title {
+    font-family: var(--f-display);
+    font-weight: 650;
+    font-size: var(--s1);
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
+  .post-row__ex {
+    grid-column: 2;
+    color: var(--ink-2);
+    margin-top: 0.3rem;
+  }
+  .post-row:hover .post-row__title {
+    text-decoration: underline;
+    text-decoration-color: var(--teal);
+    text-decoration-thickness: 3px;
+  }
+  .dice {
+    padding: 1.4rem;
+    background: var(--magenta);
+    color: #15130f;
+    transform: rotate(-1.2deg);
+    margin-top: 12px;
+  }
+  .dice .label {
+    margin-bottom: 0.6rem;
+  }
+  .dice__text {
+    font-weight: 500;
+    margin-bottom: 1.2rem;
+  }
+
+  @media (max-width: 960px) {
+    .hero,
+    .home-split {
+      grid-template-columns: 1fr;
+    }
+    .shelf,
+    .dice {
+      transform: none;
+    }
+  }
+  @media (max-width: 760px) {
+    .feat {
+      grid-template-columns: 1fr;
+    }
+    .feat__cover {
+      border-right: 0;
+      border-bottom: var(--bw) solid var(--line);
+      aspect-ratio: 16 / 10;
+    }
+    .post-row {
+      grid-template-columns: 1fr;
+    }
+    .post-row__ex {
+      grid-column: 1;
+    }
+  }
+  @media (max-width: 480px) {
+    .hero__search {
+      flex-direction: column;
+    }
+    .shelf__grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+</style>

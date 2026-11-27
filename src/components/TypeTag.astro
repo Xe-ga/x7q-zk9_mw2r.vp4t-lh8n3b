@@ -1,0 +1,12 @@
+---
+import { TRANSLATION_TYPES, type TranslationType } from '../data/taxonomy';
+import { u } from '../lib/util';
+import Icon from './Icon.astro';
+interface Props { type: TranslationType; big?: boolean; link?: boolean }
+const { type, big = false, link = false } = Astro.props;
+const t = TRANSLATION_TYPES[type];
+const Tag = link ? 'a' : 'span';
+---
+<Tag class:list={['tag', `tag--${type}`, { 'tag--big': big }]} title={t.hint} href={link ? u(`/search/?type=${type}`) : undefined}>
+  {type === 'wasted' && <Icon name="skull" />}{t.label}
+</Tag>

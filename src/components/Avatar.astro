@@ -1,0 +1,20 @@
+---
+// Аватар переводчика или модератора. Нет картинки — квадрат с инициалами.
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+interface Props { image?: ImageMetadata | null; name: string; size?: number; class?: string }
+const { image, name, size = 64, class: cls = '' } = Astro.props;
+const COLORS = ['var(--teal)', 'var(--yellow)', 'var(--magenta)', 'var(--orange)', 'var(--sky)', 'var(--green)'];
+const color = COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
+const initials = name
+  .split(/[\s_\-.]+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((w) => w[0]!.toUpperCase())
+  .join('');
+---
+{image ? (
+  <Image src={image} alt="" width={size} height={size} widths={[size, size * 2]} sizes={`${size}px`} class={`avatar ${cls}`} style={`--size:${size}px`} />
+) : (
+  <span class={`avatar avatar--empty ${cls}`} style={`--size:${size}px;--bg:${color}`} aria-hidden="true">{initials}</span>
+)}

@@ -1,0 +1,73 @@
+---
+import Base from '../../layouts/Base.astro';
+import GameCard from '../../components/GameCard.astro';
+import Icon from '../../components/Icon.astro';
+import { PLATFORMS } from '../../data/platforms';
+import { getGames, getLookups, u, plural } from '../../lib/util';
+export async function getStaticPaths() {
+  return PLATFORMS.map((p) => ({ params: { slug: p.slug }, props: { p } }));
+}
+const { p } = Astro.props;
+const games = (await getGames()).filter((g) => g.data.platform === p.slug);
+const { publishers } = await getLookups();
+---
+<Base title={`Переводы для ${p.name}`} description={`Русские переводы игр для ${p.name}: ${games.length} в архиве.`}>
+  <div class="wrap">
+    <header class="phead">
+      <div class="phead__ico"><Icon name={p.slug} platform /></div>
+      <div>
+        <p class="label muted"><a href={u('/platforms/')}>Платформы</a> / {p.maker}, {p.year}</p>
+        <h1>{p.name}</h1>
+        <p class="phead__n mono">
+          {games.length} {plural(games.length, ['перевод', 'перевода', 'переводов'])} ·
+          <a href={u(`/search/?platform=${p.slug}`)}>искать с фильтрами</a>
+        </p>
+      </div>
+    </header>
+    {games.length ? (
+      <div class="grid-cards">
+        {games.map((g) => <GameCard game={g} publisherName={g.data.publisher ? publishers[g.data.publisher.id]?.name : undefined} />)}
+      </div>
+    ) : (
+      <p class="pempty">Для этой платформы переводов пока нет. Загляните позже или посмотрите <a href={u('/search/')}>весь каталог</a>.</p>
+    )}
+  </div>
+</Base>
+<style>
+  .phead {
+    display: flex;
+    gap: clamp(16px, 3vw, 32px);
+    align-items: center;
+    padding-block: clamp(28px, 4vw, 52px) 2rem;
+    margin-bottom: 2rem;
+    border-bottom: var(--bw) solid var(--line);
+  }
+  .phead__ico {
+    flex: none;
+    width: clamp(84px, 12vw, 128px);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    background: var(--yellow);
+    color: #15130f;
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-panel);
+    box-shadow: var(--sh);
+    transform: rotate(-3deg);
+  }
+  .phead__ico :global(.ico) {
+    width: 78%;
+    height: 78%;
+  }
+  .phead h1 {
+    margin: 0.3rem 0 0.5rem;
+  }
+  .phead__n {
+    margin: 0;
+    color: var(--ink-2);
+  }
+  .pempty {
+    font-size: var(--s1);
+    max-width: 40ch;
+  }
+</style>

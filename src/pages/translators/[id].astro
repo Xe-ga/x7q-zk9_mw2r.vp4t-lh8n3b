@@ -1,0 +1,267 @@
+---
+import Base from '../../layouts/Base.astro';
+import Cover from '../../components/Cover.astro';
+import TypeTag from '../../components/TypeTag.astro';
+import VerdictTag from '../../components/VerdictTag.astro';
+import Icon from '../../components/Icon.astro';
+import Comments from '../../components/Comments.astro';
+import Rating from '../../components/Rating.astro';
+import Avatar from '../../components/Avatar.astro';
+import { getTranslatorsWithWorks } from '../../lib/translators';
+import { PLATFORM_BY_SLUG } from '../../data/platforms';
+import { TRANSLATION_TYPE_KEYS } from '../../data/taxonomy';
+import { u, plural, host, fmtShort } from '../../lib/util';
+
+export async function getStaticPaths() {
+  const list = await getTranslatorsWithWorks();
+  return list.map((tr) => ({ params: { id: tr.id }, props: { tr } }));
+}
+const { tr } = Astro.props;
+const n = tr.works.length;
+const works = [...tr.works].sort((a, b) => b.game.data.date.valueOf() - a.game.data.date.valueOf());
+---
+<Base edit={`translators/entries/${tr.id}`} title={`Переводчик ${tr.name}`} description={`${tr.name}: ${n} ${plural(n, ['перевод', 'перевода', 'переводов'])} в архиве, рекомендации и отзывы игроков.`}>
+  <div class="wrap trp">
+    <nav class="crumbs label" aria-label="Навигация"><a href={u('/translators/')}>Переводчики</a> / <span aria-current="page">{tr.name}</span></nav>
+
+    <header class="trp__head">
+      <div class="trp__who">
+        <Avatar image={tr.avatar} name={tr.name} size={104} />
+        <div>
+          <p class="label muted">Переводчик</p>
+          <h1 class="trp__name">{tr.name}</h1>
+          <p class="trp__n mono">{n} {plural(n, ['перевод', 'перевода', 'переводов'])} в архиве</p>
+        </div>
+      </div>
+      {tr.url && (
+        <a class="btn btn--yellow trp__ext" href={tr.url} rel="noopener" target="_blank">
+          <Icon name="external-link" />Страница переводчика
+          <span class="trp__host mono">{host(tr.url)}</span>
+        </a>
+      )}
+    </header>
+
+    {n > 0 && (
+      <section class="trp__stats" aria-label="Статистика">
+        <div class="stat panel">
+          <h2 class="label">Тип переводов</h2>
+          <ul>
+            {TRANSLATION_TYPE_KEYS.filter((k) => tr.types[k]).map((k) => (
+              <li><TypeTag type={k} link /><span class="stat__bar" style={`--w:${(tr.types[k]! / n) * 100}%`}></span><b class="mono">{tr.types[k]}</b></li>
+            ))}
+            {tr.types.port && (
+              <li><a class="tag tag--port" href={u('/search/?status=port')}>Порт</a><span class="stat__bar" style={`--w:${(tr.types.port / n) * 100}%`}></span><b class="mono">{tr.types.port}</b></li>
+            )}
+          </ul>
+        </div>
+        <div class="stat panel">
+          <Rating
+            gameId={`translator--${tr.id}`}
+            tkey="translator"
+            allKeys={['translator']}
+            title="Оценка переводчика"
+            ask="Оцените работу переводчика <b>в целом</b> — по всем его переводам, которые пробовали."
+          />
+        </div>
+      </section>
+    )}
+
+    <section class="trp__works" aria-labelledby="works-h">
+      <div class="sec-head"><h2 id="works-h">Переводы</h2></div>
+      <ul class="works">
+        {works.map((w) => { const { game, t } = w; return (
+          <li>
+            <a class="work" href={u(`/games/${game.id}/#translations`)}>
+              <span class="work__cover"><Cover cover={game.data.cover} title={game.data.title} platform={game.data.platform} widths={[120, 200]} sizes="96px" /></span>
+              <span class="work__body">
+                <span class="work__title">{game.data.title}</span>
+                <span class="work__meta mono">{PLATFORM_BY_SLUG[game.data.platform].short}{game.data.year && ` · ${game.data.year}`} · {fmtShort(t.date ?? game.data.date)}</span>
+                <span class="work__tags">
+                  {w.role === 'porter' ? <span class="tag tag--port">Порт</span> : <TypeTag type={t.type} />}
+                  <VerdictTag verdict={t.verdict} label={t.verdictLabel} note={t.verdictNote} />
+                </span>
+                {w.role === 'porter' && <span class="work__with muted">портировал чужой перевод</span>}
+                {w.role === 'translator' && t.port && <span class="work__with muted">здесь — порт его перевода на эту версию</span>}
+                {w.role === 'translator' && t.translators.length > 1 && <span class="work__with muted">совместный перевод</span>}
+              </span>
+            </a>
+          </li>
+        ); })}
+      </ul>
+      {n === 0 && <p class="muted">Переводов в архиве пока нет.</p>}
+    </section>
+
+    <Comments
+      gameId={`translator--${tr.id}`}
+      title="Отзывы о переводчике"
+      placeholder={`Что думаете о переводах ${tr.name}? Благодарность тоже можно.`}
+    />
+  </div>
+</Base>
+<style>
+  .trp {
+    padding-top: clamp(20px, 3vw, 36px);
+  }
+  .crumbs {
+    color: var(--ink-2);
+    margin-bottom: clamp(20px, 3vw, 32px);
+  }
+  .crumbs a {
+    text-decoration: none;
+  }
+  .crumbs a:hover {
+    text-decoration: underline;
+  }
+  .trp__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 20px 40px;
+    padding-bottom: 1.6rem;
+    border-bottom: var(--bw) solid var(--line);
+  }
+  .trp__who {
+    display: flex;
+    align-items: center;
+    gap: clamp(14px, 2.5vw, 24px);
+    min-width: 0;
+  }
+  .trp__who > div {
+    min-width: 0;
+  }
+  .trp__name {
+    margin: 0.3rem 0 0.6rem;
+    overflow-wrap: anywhere;
+  }
+  .trp__n {
+    margin: 0;
+    color: var(--ink-2);
+  }
+  .trp__ext {
+    flex-wrap: wrap;
+  }
+  .trp__host {
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.75;
+  }
+  .trp__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: 22px;
+    margin-top: 2rem;
+  }
+  .stat {
+    padding: 1.1rem 1.2rem;
+    box-shadow: var(--sh-sm);
+  }
+  .stat h2 {
+    font-size: var(--s-1);
+    margin-bottom: 0.9rem;
+  }
+  .stat ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .stat li {
+    display: grid;
+    grid-template-columns: 170px minmax(0, 1fr) 2.5em;
+    align-items: center;
+    gap: 10px;
+  }
+  .stat__bar {
+    height: 10px;
+    background: linear-gradient(var(--ink), var(--ink)) left / var(--w) 100% no-repeat, var(--paper-2);
+    border: 1.5px solid var(--line);
+    border-radius: 2px;
+  }
+  .stat li b {
+    text-align: right;
+  }
+  .stat li > :first-child {
+    justify-self: start;
+  }
+  .trp__works {
+    margin-top: clamp(40px, 5vw, 64px);
+  }
+  .works {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+    gap: 16px;
+  }
+  .work {
+    display: flex;
+    gap: 14px;
+    height: 100%;
+    padding: 10px;
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-sm);
+    text-decoration: none;
+    transition:
+      transform 0.12s var(--ease),
+      box-shadow 0.12s var(--ease);
+  }
+  .work:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--sh);
+  }
+  .work:hover .work__title {
+    text-decoration: underline;
+    text-decoration-color: var(--teal);
+    text-decoration-thickness: 3px;
+  }
+  .work__cover {
+    flex: none;
+    width: 84px;
+    aspect-ratio: 4 / 5;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+    overflow: hidden;
+  }
+  .work__cover :global(.cover-fallback__title),
+  .work__cover :global(.cover-fallback__plat) {
+    display: none;
+  }
+  .work__body {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  .work__title {
+    font-family: var(--f-display);
+    font-weight: 650;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  .work__meta {
+    font-size: 0.78rem;
+    color: var(--ink-2);
+  }
+  .work__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+  }
+  .work__with {
+    font-size: 0.8rem;
+  }
+  @media (max-width: 480px) {
+    .stat li {
+      grid-template-columns: minmax(0, 1fr) 2.5em;
+    }
+    .stat__bar {
+      display: none;
+    }
+  }
+</style>

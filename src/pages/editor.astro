@@ -1,0 +1,1247 @@
+---
+// Редактор карточки игры прямо на сайте: анкета слева, живой предпросмотр справа.
+// Сохраняет в GitHub (как админка), после чего сайт пересобирается сам.
+import { getCollection, getEntry } from 'astro:content';
+import { getImage } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { PLATFORMS } from '../data/platforms';
+import { TRANSLATION_TYPES, TRANSLATION_TYPE_KEYS, VERDICTS, VERDICT_KEYS, STATUSES, STATUS_KEYS, GAPS, GAP_KEYS, UPDATING, GENRES } from '../data/taxonomy';
+import { REPO } from '../config';
+import { u } from '../lib/util';
+
+// Исходные тексты карточек — чтобы открыть игру на правку даже без входа в GitHub
+const raw = import.meta.glob('/src/content/games/*/index.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+const games = await getCollection('games');
+const coverUrls: Record<string, string> = {};
+for (const g of games) if (g.data.cover) coverUrls[g.id] = (await getImage({ src: g.data.cover, width: 480, format: 'webp' })).src;
+const sources = Object.fromEntries(Object.entries(raw).map(([p, text]) => [p.split('/').at(-2), text]));
+
+const sortByName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'ru');
+const translators = (await getCollection('translators')).map((t) => ({ id: t.id, name: t.data.name })).sort(sortByName);
+const publishers = (await getCollection('publishers')).map((p) => ({ id: p.id, name: p.data.name })).sort(sortByName);
+const moderators = (await getCollection('moderators')).map((m) => ({ id: m.id, name: m.data.name })).sort(sortByName);
+
+const DATA = {
+  base: import.meta.env.BASE_URL,
+  repo: REPO,
+  platforms: PLATFORMS.map((p) => ({ slug: p.slug, name: p.name, short: p.short })),
+  types: TRANSLATION_TYPES,
+  verdicts: VERDICTS,
+  statuses: STATUSES,
+  updating: UPDATING,
+  gaps: GAPS,
+  translators,
+  publishers,
+  moderators,
+  sources,
+  coverUrls,
+};
+---
+<Base title="Редактор карточки" noindex>
+  <div class="wrap ed" id="ed">
+    <script type="application/json" id="ed-data" set:html={JSON.stringify(DATA)} />
+
+    <header class="ed__head">
+      <div>
+        <p class="label muted" id="ed-mode">Новая карточка</p>
+        <h1 class="ed__title" id="ed-h">Новая игра</h1>
+      </div>
+      <div class="ed__auth panel" id="ed-auth"></div>
+    </header>
+
+    <div class="ed__tabs" role="tablist" aria-label="Вид">
+      <button type="button" role="tab" aria-selected="true" data-view="form">Анкета</button>
+      <button type="button" role="tab" aria-selected="false" data-view="preview">Предпросмотр</button>
+    </div>
+
+    <div class="ed__grid" data-view="form">
+      <form class="ed__form" id="ed-form" novalidate autocomplete="off">
+        <!-- ───────── Игра ───────── -->
+        <section class="ed__sec panel">
+          <h2 class="ed__h">Игра</h2>
+          <div class="f">
+            <label class="label" for="f-title">Название *</label>
+            <input class="field" id="f-title" name="title" required placeholder="Как на коробке или в английской версии" />
+          </div>
+          <div class="f">
+            <label class="label" for="f-alt">Другие названия</label>
+            <textarea class="field f--short" id="f-alt" name="altTitles" placeholder="По одному в строке: японское, европейское… По ним тоже ищут"></textarea>
+          </div>
+          <div class="f2">
+            <div class="f">
+              <label class="label" for="f-platform">Платформа *</label>
+              <select class="field" id="f-platform" name="platform" required>
+                <option value="">— выберите —</option>
+                {PLATFORMS.map((p) => <option value={p.slug}>{p.name}</option>)}
+              </select>
+            </div>
+            <div class="f">
+              <label class="label" for="f-year">Год выхода игры</label>
+              <input class="field" id="f-year" name="year" type="number" min="1970" max="2100" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="f2">
+            <div class="f">
+              <label class="label" for="f-pub">Издатель</label>
+              <select class="field" id="f-pub" name="publisher">
+                <option value="">— не указан —</option>
+                {publishers.map((p) => <option value={p.id}>{p.name}</option>)}
+                <option value="__new">+ Новый издатель…</option>
+              </select>
+              <input class="field f-new" id="f-pub-new" name="publisherNew" placeholder="Название нового издателя" hidden />
+            </div>
+            <div class="f">
+              <label class="label" for="f-dev">Разработчик</label>
+              <input class="field" id="f-dev" name="developer" />
+            </div>
+          </div>
+          <div class="f">
+            <span class="label">Жанры</span>
+            <div class="chips">
+              {GENRES.map((g) => (
+                <label class="chip"><input type="checkbox" name="genres" value={g} />{g}</label>
+              ))}
+            </div>
+          </div>
+          <div class="f">
+            <span class="label">Обложка</span>
+            <div class="cover-in">
+              <div class="cover-in__pv" id="f-cover-pv"></div>
+              <div>
+                <label class="btn btn--sm" for="f-cover"><Icon name="upload" />Выбрать картинку</label>
+                <input id="f-cover" name="cover" type="file" accept="image/*" class="sr-only" />
+                <p class="hint">JPG или PNG. Сайт сам уменьшит и сожмёт. Нет обложки — будет заглушка с иконкой консоли.</p>
+                <button type="button" class="link-btn" id="f-cover-clear" hidden>Убрать новую картинку</button>
+              </div>
+            </div>
+          </div>
+          <div class="f">
+            <label class="label" for="f-body">Описание игры</label>
+            <textarea class="field f--tall" id="f-body" name="body" placeholder="Пара абзацев о сюжете и геймплее. Пустая строка — новый абзац. **Жирный**, *курсив*."></textarea>
+          </div>
+        </section>
+
+        <!-- ───────── Переводы ───────── -->
+        <section class="ed__sec">
+          <div class="ed__sec-head">
+            <h2 class="ed__h">Переводы</h2>
+            <span class="hint">На сайте сами отсортируются от лучшей рекомендации к худшей</span>
+          </div>
+          <div id="trs"></div>
+          <button type="button" class="btn ed__add" id="tr-add"><Icon name="tag" />Добавить перевод</button>
+        </section>
+
+        <!-- ───────── Публикация ───────── -->
+        <section class="ed__sec panel ed__pub">
+          <label class="check"><input type="checkbox" name="draft" />Черновик — не показывать на сайте</label>
+          <label class="check" id="f-bump-wrap" hidden><input type="checkbox" name="bump" />Поднять в «Свежие переводы» (обновить дату)</label>
+          <div class="ed__actions">
+            <button type="submit" class="btn btn--primary btn--big" id="ed-save"><Icon name="upload" />Сохранить</button>
+            <button type="button" class="btn" id="ed-download"><Icon name="download" />Скачать файл карточки</button>
+          </div>
+          <div class="ed__msg" id="ed-msg" role="status" aria-live="polite"></div>
+        </section>
+      </form>
+
+      <!-- ───────── Предпросмотр ───────── -->
+      <aside class="ed__preview" aria-label="Предпросмотр">
+        <p class="label muted ed__pv-label">Так это будет выглядеть</p>
+        <div class="pv-card" id="pv-card"></div>
+        <div class="pv-page panel" id="pv-page"></div>
+      </aside>
+    </div>
+
+    <!-- Шаблон одного перевода -->
+    <template id="tr-tpl">
+      <fieldset class="etr panel">
+        <div class="etr__head">
+          <legend class="etr__title">Перевод <span data-num></span></legend>
+          <button type="button" class="link-btn etr__del" data-del>Удалить перевод</button>
+        </div>
+
+        <div class="f">
+          <span class="label">Тип перевода *</span>
+          <div class="chips">
+            {TRANSLATION_TYPE_KEYS.map((k) => (
+              <label class={`chip chip--r tag--${k}`}><input type="radio" data-f="type" value={k} />{TRANSLATION_TYPES[k].label}</label>
+            ))}
+          </div>
+        </div>
+
+        <div class="f">
+          <span class="label">Рекомендация</span>
+          <div class="chips">
+            {VERDICT_KEYS.map((k) => (
+              <label class="chip chip--r chip--v">
+                <input type="radio" data-f="verdict" value={k} />
+                <span class={`vmeter vmeter--${k}`} aria-hidden="true">{[1, 2, 3, 4].map((i) => <i class:list={{ on: i <= VERDICTS[k].level }}></i>)}</span>
+                {VERDICTS[k].label}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div class="f2">
+          <div class="f">
+            <label class="label">Своё название рекомендации</label>
+            <input class="field" data-f="verdictLabel" placeholder="Например: Через боль" />
+          </div>
+          <div class="f">
+            <label class="label">Почему такая рекомендация</label>
+            <input class="field" data-f="verdictNote" placeholder="Одна-две фразы своими словами" />
+          </div>
+        </div>
+
+        <div class="f">
+          <span class="label">Состояние</span>
+          <div class="chips">
+            {STATUS_KEYS.map((k) => (
+              <label class="chip chip--r"><input type="radio" data-f="status" value={k} /><Icon name={STATUSES[k].icon} />{STATUSES[k].label}</label>
+            ))}
+            <label class="chip"><input type="checkbox" data-f="updating" /><Icon name={UPDATING.icon} />{UPDATING.label}</label>
+          </div>
+          <div class="chips chips--gaps">
+            {GAP_KEYS.map((k) => (
+              <label class="chip chip--gap"><input type="checkbox" data-f="gaps" value={k} />{GAPS[k]}</label>
+            ))}
+          </div>
+          <input class="field" data-f="gapsCustom" placeholder="Свои отметки через запятую: часть интерфейса, надписи на картах…" />
+          <input class="field" data-f="statusNote" placeholder="Сноска: что именно не переведено или не так («не переведены главы 5–7»)" />
+        </div>
+
+        <div class="f">
+          <span class="label">Переводчики</span>
+          <input class="field f-filter" data-people-filter placeholder="Найти в списке…" />
+          <div class="chips chips--people" data-people="translators">
+            {translators.map((t) => <label class="chip"><input type="checkbox" data-f="translators" value={t.id} />{t.name}</label>)}
+          </div>
+          <input class="field" data-f="translatorsNew" placeholder="Нет в списке? Впишите ник (несколько — через запятую)" />
+        </div>
+
+        <label class="check"><input type="checkbox" data-f="port" />Это порт — готовый перевод перенесён на другую версию игры</label>
+        <div class="etr__port" data-port-box hidden>
+          <div class="f">
+            <span class="label">Портировщики</span>
+            <div class="chips chips--people">
+              {translators.map((t) => <label class="chip"><input type="checkbox" data-f="porters" value={t.id} />{t.name}</label>)}
+            </div>
+            <input class="field" data-f="portersNew" placeholder="Нет в списке? Впишите ник" />
+          </div>
+          <div class="f2">
+            <div class="f"><label class="label">Откуда порт</label><input class="field" data-f="portFrom" placeholder="с японской версии" /></div>
+            <div class="f"><label class="label">Ссылка на оригинальный перевод</label><input class="field" data-f="originalUrl" type="url" placeholder="https://…" /></div>
+          </div>
+        </div>
+
+        <div class="f2">
+          <div class="f">
+            <label class="label">Ссылка на ресурс переводчика</label>
+            <input class="field" data-f="sourceUrl" type="url" placeholder="https://… — главная кнопка «Скачать у переводчика»" />
+          </div>
+          <div class="f">
+            <label class="label">Ссылка на пост в Telegram</label>
+            <input class="field" data-f="download" type="url" placeholder="https://t.me/…" />
+          </div>
+        </div>
+
+        <div class="f">
+          <label class="label">Модератор</label>
+          <select class="field" data-f="moderator">
+            <option value="">— не указан —</option>
+            {moderators.map((m) => <option value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
+        <div class="f">
+          <label class="label">Комментарий модератора</label>
+          <textarea class="field f--short" data-f="moderatorNote" placeholder="Ваше мнение о переводе"></textarea>
+        </div>
+        <div class="f">
+          <label class="label">Комментарий переводчика</label>
+          <textarea class="field f--short" data-f="translatorNote" placeholder="Если переводчик что-то просил передать"></textarea>
+        </div>
+        <input type="hidden" data-f="date" />
+      </fieldset>
+    </template>
+  </div>
+</Base>
+
+<script>
+  import { parse as parseYaml, stringify as toYaml } from 'yaml';
+  import { hasRepo, ghToken, whoAmI, readFile, writeFile, fileSha, GhError } from '../scripts/github';
+  import { modAuth } from '../scripts/backend';
+  import { translit } from '../scripts/trigram';
+
+  type Tr = Record<string, any>;
+  const D = JSON.parse(document.getElementById('ed-data')!.textContent!);
+  const base = String(D.base).replace(/\/$/, '');
+  const $ = <T extends HTMLElement = HTMLElement>(s: string, r: ParentNode = document) => r.querySelector(s) as T;
+  const $$ = <T extends HTMLElement = HTMLElement>(s: string, r: ParentNode = document) => [...r.querySelectorAll(s)] as T[];
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  const icon = (dir: string, n: string, cls = '') => `<span class="ico ${cls}" style="--src:url('${base}/icons/${dir}/${n}.svg')" aria-hidden="true"></span>`;
+  const slugify = (s: string) =>
+    translit(s.toLowerCase()).normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'igra';
+  const nameOf = (list: { id: string; name: string }[], id: string) => list.find((x) => x.id === id)?.name ?? id;
+
+  const form = $<HTMLFormElement>('#ed-form');
+  const trs = $('#trs');
+  const tpl = $<HTMLTemplateElement>('#tr-tpl');
+  const msg = $('#ed-msg');
+  let editingId: string | null = new URLSearchParams(location.search).get('game');
+  let editingSha: string | null = null;
+  let origFrontmatter: Record<string, any> = {};
+  let newCover: { blob: Blob; ext: string; url: string } | null = null;
+  let dirty = false;
+  let trCounter = 0;
+
+  // ───────── Переводы ─────────
+  function addTranslation(t: Tr = {}, isNew = true) {
+    const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+    const uid = `t${++trCounter}`;
+    // у радиокнопок каждого перевода своя группа
+    for (const r of $$<HTMLInputElement>('input[type=radio]', node)) r.name = `${uid}-${r.dataset.f}`;
+    trs.appendChild(node);
+    fillTranslation(node, {
+      type: 'manual', status: 'full',
+      moderator: isNew ? D.moderators.find((m: any) => m.name === modAuth.get()?.name)?.id ?? '' : '',
+      date: isNew && editingId ? new Date().toISOString() : '',
+      ...t,
+    });
+    renumber();
+    return node;
+  }
+  function renumber() {
+    $$('.etr', trs).forEach((el, i) => {
+      $('[data-num]', el).textContent = `${i + 1}`;
+      ($('[data-del]', el) as HTMLButtonElement).hidden = $$('.etr', trs).length < 2;
+    });
+  }
+  function fillTranslation(el: HTMLElement, t: Tr) {
+    for (const inp of $$<HTMLInputElement>('[data-f]', el)) {
+      const f = inp.dataset.f!;
+      const v = t[f];
+      if (inp.type === 'radio') inp.checked = inp.value === (v ?? (f === 'status' ? 'full' : ''));
+      else if (inp.type === 'checkbox' && inp.value && inp.value !== 'on') inp.checked = Array.isArray(v) && v.includes(inp.value);
+      else if (inp.type === 'checkbox') inp.checked = !!v;
+      else inp.value = v == null ? '' : Array.isArray(v) ? v.join(', ') : v instanceof Date ? v.toISOString() : String(v);
+    }
+    ($('[data-port-box]', el) as HTMLElement).hidden = !t.port;
+  }
+  function readTranslation(el: HTMLElement): Tr {
+    const t: Tr = {};
+    for (const inp of $$<HTMLInputElement>('[data-f]', el)) {
+      const f = inp.dataset.f!;
+      if (inp.type === 'radio') {
+        if (inp.checked) t[f] = inp.value;
+      } else if (inp.type === 'checkbox' && inp.value && inp.value !== 'on') {
+        (t[f] ??= []);
+        if (inp.checked) t[f].push(inp.value);
+      } else if (inp.type === 'checkbox') t[f] = inp.checked;
+      else t[f] = inp.value.trim();
+    }
+    return t;
+  }
+
+  // ───────── Чтение всей анкеты ─────────
+  function splitNames(s: string) {
+    return s.split(',').map((x) => x.trim()).filter(Boolean);
+  }
+  function readForm() {
+    const fd = new FormData(form);
+    const val = (k: string) => String(fd.get(k) ?? '').trim();
+    return {
+      title: val('title'),
+      altTitles: val('altTitles').split('\n').map((x) => x.trim()).filter(Boolean),
+      platform: val('platform'),
+      year: val('year') ? Number(val('year')) : null,
+      publisher: val('publisher') === '__new' ? '' : val('publisher'),
+      publisherNew: val('publisher') === '__new' ? val('publisherNew') : '',
+      developer: val('developer'),
+      genres: fd.getAll('genres').map(String),
+      body: String(fd.get('body') ?? ''),
+      draft: fd.get('draft') === 'on',
+      bump: fd.get('bump') === 'on',
+      translations: $$('.etr', trs).map(readTranslation),
+    };
+  }
+
+  // ───────── Предпросмотр ─────────
+  const VORDER: Record<string, number> = Object.fromEntries(Object.entries(D.verdicts).map(([k, v]: any) => [k, v.rank]));
+  const vOf = (t: Tr) => t.verdict || 'untested';
+  function peopleNames(ids: string[] = [], extra = '') {
+    return [...ids.map((id) => nameOf(D.translators, id)), ...splitNames(extra)];
+  }
+  function verdictHtml(t: Tr, mini = false) {
+    const k = vOf(t);
+    const v = D.verdicts[k];
+    const name = (k !== 'untested' && t.verdictLabel) || v.label;
+    const meter = `<span class="vmeter vmeter--${k}"${mini ? ` role="img" title="Рекомендация: ${esc(name)}"` : ' aria-hidden="true"'}>${[1, 2, 3, 4].map((i) => `<i${i <= v.level ? ' class="on"' : ''}></i>`).join('')}</span>`;
+    return mini ? meter : `<span class="verdict verdict--${k}">${meter}${esc(name)}</span>`;
+  }
+  function statusHtml(t: Tr, withGaps = false) {
+    let h = '';
+    if (t.status && t.status !== 'full' || withGaps) {
+      const s = D.statuses[t.status || 'full'];
+      h += `<span class="status status--${t.status || 'full'}">${icon('ui', s.icon)}${s.label}${t.statusNote && !withGaps ? '<sup>*</sup>' : ''}</span>`;
+    }
+    if (t.updating) h += `<span class="status status--upd">${icon('ui', D.updating.icon)}${D.updating.label}</span>`;
+    if (withGaps) {
+      for (const g of t.gaps || []) h += `<span class="gap">${esc(D.gaps[g])}</span>`;
+      for (const g of splitNames(t.gapsCustom || '')) h += `<span class="gap">${esc(g)}</span>`;
+    }
+    return h;
+  }
+  function coverHtml(title: string, platform: string) {
+    const url = newCover?.url ?? (editingId ? D.coverUrls[editingId] : null);
+    if (url) return `<img class="cover-img" src="${esc(url)}" alt="">`;
+    const FB = ['var(--teal)', 'var(--yellow)', 'var(--magenta)', 'var(--orange)', 'var(--sky)', 'var(--green)'];
+    const idx = [...(platform || 'x')].reduce((a, c) => a + c.charCodeAt(0), 0) % FB.length;
+    return `<div class="cover-fallback" style="--fb:${FB[idx]}">${platform ? icon('platforms', platform, 'cover-fallback__ico') : ''}<span class="cover-fallback__title">${esc(title || 'Название игры')}</span></div>`;
+  }
+
+  function renderPreview() {
+    const g = readForm();
+    const plat = D.platforms.find((p: any) => p.slug === g.platform);
+    const ranked = [...g.translations].sort((a, b) => (VORDER[vOf(b)] ?? 0) - (VORDER[vOf(a)] ?? 0));
+    const best = ranked[0] ?? {};
+    const pubName = g.publisherNew || (g.publisher ? nameOf(D.publishers, g.publisher) : '');
+    const meta = [g.year, pubName].filter(Boolean).join(' · ');
+
+    $('#pv-card').innerHTML = `<article class="gcard"><div class="gcard__link">
+      <div class="gcard__cover">${coverHtml(g.title, g.platform)}${plat ? `<span class="tag tag--plat gcard__plat">${icon('platforms', plat.slug)}${esc(plat.short)}</span>` : ''}</div>
+      <div class="gcard__body"><h3 class="gcard__title">${esc(g.title || 'Название игры')}</h3>${meta ? `<p class="gcard__meta">${esc(meta)}</p>` : ''}
+      <div class="gcard__foot">${best.port ? '<span class="tag tag--port">Порт</span>' : ''}${best.type ? `<span class="tag tag--${best.type}">${esc(D.types[best.type].label)}</span>` : ''}${best.type ? verdictHtml(best, true) : ''}${best.type ? statusHtml(best) : ''}${g.translations.length > 1 ? `<span class="gcard__more">+${g.translations.length - 1}</span>` : ''}</div>
+      </div></div></article>`;
+
+    const cards = ranked
+      .map((t) => {
+        const people = peopleNames(t.translators, t.translatorsNew);
+        const porters = peopleNames(t.porters, t.portersNew);
+        const mod = t.moderator ? nameOf(D.moderators, t.moderator) : '';
+        const hint = t.verdictNote ? `<b>${esc(t.verdictNote.replace(/\.$/, ''))}.</b>` : `${esc(D.verdicts[vOf(t)].hint)}.`;
+        const sourceHost = (() => { try { return new URL(t.sourceUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })();
+        return `<article class="pv-tr">
+          <div class="pv-tr__head">${t.port ? '<span class="tag tag--port">Порт</span>' : ''}<span class="tag tag--${t.type}">${esc(D.types[t.type]?.label ?? '')}</span>${verdictHtml(t)}</div>
+          <p class="pv-tr__hint">${hint}${mod && t.verdict && t.verdict !== 'untested' ? ` <span class="modpill">${icon('ui', 'user')}${esc(mod)}</span>` : ''}</p>
+          <div class="pv-tr__state">${statusHtml(t, true)}${t.statusNote ? `<p class="status-note"><b>*</b> ${esc(t.statusNote)}</p>` : ''}</div>
+          ${t.port ? `<p class="pv-tr__port">Порт${t.portFrom ? ' ' + esc(t.portFrom) : ''}.${t.originalUrl ? ' <u>Оригинальный перевод</u>' : ''}</p>` : ''}
+          <p class="pv-tr__who"><span class="label muted">${t.port ? 'Перевод оригинала' : 'Переводчик'}</span> ${people.length ? people.map((p) => `<u>${esc(p)}</u>`).join(', ') : '<span class="muted">не указан</span>'}</p>
+          ${t.port ? `<p class="pv-tr__who"><span class="label muted">Портировщик</span> ${porters.map((p) => `<u>${esc(p)}</u>`).join(', ') || '<span class="muted">не указан</span>'}</p>` : ''}
+          ${t.moderatorNote ? `<section class="note note--mod"><span class="note__tab label">Модератор${mod ? ': ' + esc(mod) : ''}</span><p>${esc(t.moderatorNote)}</p></section>` : ''}
+          ${t.translatorNote ? `<section class="note note--tr"><span class="note__tab label">${t.port && porters[0] ? 'От портировщика: ' + esc(porters[0]) : 'От переводчика' + (people[0] ? ': ' + esc(people[0]) : '')}</span><p>${esc(t.translatorNote)}</p></section>` : ''}
+          <div class="pv-tr__dl">
+            ${t.sourceUrl ? `<span class="btn btn--primary">${icon('ui', 'download')}Скачать у переводчика</span>${sourceHost ? `<span class="mono pv-tr__host">${esc(sourceHost)}</span>` : ''}` : ''}
+            ${t.download ? `<span class="btn btn--ghost">${icon('ui', 'external-link')}Скачать из Telegram-канала</span>` : ''}
+            ${!t.sourceUrl && !t.download ? '<span class="pv-warn">Нет ни одной ссылки на скачивание</span>' : ''}
+          </div>
+        </article>`;
+      })
+      .join('');
+    const desc = g.body.trim()
+      ? g.body.trim().split(/\n\s*\n/).map((p) => `<p>${esc(p).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>')}</p>`).join('')
+      : '<p class="muted">Описание игры появится здесь.</p>';
+    $('#pv-page').innerHTML = `<h3 class="pv-page__title">${esc(g.title || 'Название игры')}</h3>
+      ${g.altTitles.length ? `<p class="mono muted pv-page__alt">${esc(g.altTitles.join(' · '))}</p>` : ''}
+      <p class="label muted pv-page__sec">${g.translations.length > 1 ? `Переводы · ${g.translations.length}` : 'Перевод'}</p>${cards}
+      <p class="label muted pv-page__sec">Об игре</p><div class="pv-page__desc">${desc}</div>`;
+    $('#ed-h').textContent = g.title || (editingId ? 'Правка карточки' : 'Новая игра');
+  }
+
+  // ───────── Загрузка существующей игры ─────────
+  function splitMd(text: string) {
+    const m = text.replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (!m) throw new Error('Не удалось прочитать файл карточки');
+    return { fm: (parseYaml(m[1]) ?? {}) as Record<string, any>, body: m[2] };
+  }
+  function fillForm(fm: Record<string, any>, body: string) {
+    const set = (n: string, v: unknown) => {
+      const el = form.elements.namedItem(n) as HTMLInputElement | null;
+      if (el) el.value = v == null ? '' : String(v);
+    };
+    set('title', fm.title);
+    set('altTitles', (fm.altTitles ?? []).join('\n'));
+    set('platform', fm.platform);
+    set('year', fm.year);
+    set('publisher', fm.publisher ?? '');
+    set('developer', fm.developer);
+    set('body', body.trim());
+    $$<HTMLInputElement>('input[name=genres]').forEach((i) => (i.checked = (fm.genres ?? []).includes(i.value)));
+    (form.elements.namedItem('draft') as HTMLInputElement).checked = !!fm.draft;
+    trs.innerHTML = '';
+    for (const t of fm.translations ?? []) addTranslation(t, false);
+    if (!(fm.translations ?? []).length) addTranslation();
+  }
+  async function loadGame(id: string) {
+    let text: string | null = null;
+    if (hasRepo && ghToken.get()) {
+      try {
+        const f = await readFile(`src/content/games/${id}/index.md`);
+        if (f) {
+          text = f.text;
+          editingSha = f.sha;
+        }
+      } catch {}
+    }
+    text ??= D.sources[id] ?? null;
+    if (!text) {
+      say(`Игра «${id}» не найдена — открыта пустая анкета.`, 'err');
+      editingId = null;
+      addTranslation();
+      return;
+    }
+    const { fm, body } = splitMd(text);
+    origFrontmatter = fm;
+    fillForm(fm, body);
+    $('#ed-mode').textContent = 'Правка карточки';
+    ($('#f-bump-wrap') as HTMLElement).hidden = false;
+    showCover();
+  }
+
+  // ───────── Обложка ─────────
+  function showCover() {
+    const url = newCover?.url ?? (editingId ? D.coverUrls[editingId] : null);
+    $('#f-cover-pv').innerHTML = url ? `<img src="${esc(url)}" alt="">` : '<span class="muted">нет</span>';
+    ($('#f-cover-clear') as HTMLElement).hidden = !newCover;
+  }
+  async function shrinkImage(file: File): Promise<{ blob: Blob; ext: string }> {
+    // уменьшаем до 1000px по длинной стороне, чтобы не раздувать репозиторий
+    const img = await createImageBitmap(file);
+    const k = Math.min(1, 1000 / Math.max(img.width, img.height));
+    if (k === 1 && file.size < 600_000) return { blob: file, ext: (file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg') };
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k);
+    c.height = Math.round(img.height * k);
+    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+    const blob: Blob = await new Promise((r) => c.toBlob((b) => r(b!), 'image/jpeg', 0.9));
+    return { blob, ext: 'jpg' };
+  }
+  $<HTMLInputElement>('#f-cover').addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const { blob, ext } = await shrinkImage(file);
+    if (newCover) URL.revokeObjectURL(newCover.url);
+    newCover = { blob, ext, url: URL.createObjectURL(blob) };
+    showCover();
+    changed();
+  });
+  $('#f-cover-clear').addEventListener('click', () => {
+    if (newCover) URL.revokeObjectURL(newCover.url);
+    newCover = null;
+    $<HTMLInputElement>('#f-cover').value = '';
+    showCover();
+    changed();
+  });
+
+  // ───────── Сборка файла карточки ─────────
+  const clean = (o: Record<string, any>) => {
+    for (const k of Object.keys(o)) if (o[k] === '' || o[k] == null || o[k] === false || (Array.isArray(o[k]) && !o[k].length)) delete o[k];
+    return o;
+  };
+  function newId(list: { id: string; name: string }[], name: string) {
+    const existing = list.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    return existing ? existing.id : slugify(name);
+  }
+  function build() {
+    const g = readForm();
+    const errors: string[] = [];
+    if (!g.title) errors.push('Не заполнено название игры.');
+    if (!g.platform) errors.push('Не выбрана платформа.');
+    if (!g.translations.length) errors.push('Нужен хотя бы один перевод.');
+    const newTranslators = new Map<string, string>();
+    const translations = g.translations.map((t, i) => {
+      const n = i + 1;
+      if (!t.type) errors.push(`Перевод ${n}: не выбран тип.`);
+      if (!t.sourceUrl && !t.download) errors.push(`Перевод ${n}: нужна ссылка на ресурс переводчика или на Telegram.`);
+      for (const k of ['sourceUrl', 'download', 'originalUrl']) if (t[k] && !/^https?:\/\//i.test(t[k])) errors.push(`Перевод ${n}: ссылка должна начинаться с https://`);
+      const people = (ids: string[], extra: string) => [
+        ...ids,
+        ...splitNames(extra).map((name) => {
+          const id = newId(D.translators, name);
+          if (!D.translators.some((x: any) => x.id === id)) newTranslators.set(id, name);
+          return id;
+        }),
+      ];
+      const out = clean({
+        type: t.type,
+        verdict: t.verdict || '',
+        verdictLabel: t.verdict && t.verdict !== 'untested' ? t.verdictLabel : '',
+        verdictNote: t.verdictNote,
+        status: t.status && t.status !== 'full' ? t.status : '',
+        updating: t.updating,
+        gaps: t.gaps,
+        gapsCustom: splitNames(t.gapsCustom ?? ''),
+        statusNote: t.statusNote,
+        translators: [...new Set(people(t.translators ?? [], t.translatorsNew))],
+        port: t.port,
+        porters: t.port ? [...new Set(people(t.porters ?? [], t.portersNew))] : [],
+        portFrom: t.port ? t.portFrom : '',
+        originalUrl: t.port ? t.originalUrl : '',
+        sourceUrl: t.sourceUrl,
+        download: t.download,
+        moderator: t.moderator,
+        moderatorNote: t.moderatorNote,
+        translatorNote: t.translatorNote,
+        date: t.date,
+      });
+      if (!out.translators) out.translators = [];
+      return out;
+    });
+    let publisher = g.publisher;
+    let newPublisher: { id: string; name: string } | null = null;
+    if (g.publisherNew) {
+      publisher = newId(D.publishers, g.publisherNew);
+      if (!D.publishers.some((x: any) => x.id === publisher)) newPublisher = { id: publisher, name: g.publisherNew };
+    }
+    const cover = newCover ? `./cover.${newCover.ext}` : origFrontmatter.cover ?? '';
+    const date = !editingId || g.bump || !origFrontmatter.date ? new Date().toISOString() : origFrontmatter.date instanceof Date ? origFrontmatter.date.toISOString() : String(origFrontmatter.date);
+    const fm = clean({
+      title: g.title,
+      altTitles: g.altTitles,
+      platform: g.platform,
+      publisher,
+      developer: g.developer,
+      year: g.year,
+      genres: g.genres,
+      cover,
+      translations,
+      date,
+      draft: g.draft,
+    });
+    const text = `---\n${toYaml(fm, { lineWidth: 0 })}---\n${g.body.trim()}\n`;
+    return { errors, text, title: g.title, newTranslators, newPublisher };
+  }
+
+  // ───────── Сообщения и вход ─────────
+  function say(html: string, kind: 'ok' | 'err' | '' = '') {
+    msg.className = `ed__msg ${kind ? 'is-' + kind : ''}`;
+    msg.innerHTML = html;
+  }
+  async function renderAuth() {
+    const box = $('#ed-auth');
+    if (!hasRepo) {
+      box.innerHTML = `<p class="label">Сохранение не настроено</p><p class="hint">Репозиторий ещё не указан в <code>src/config.ts</code>. Пока можно заполнить анкету и скачать файл карточки.</p>`;
+      return;
+    }
+    const token = ghToken.get();
+    if (!token) {
+      box.innerHTML = `<p class="label">Вход для сохранения</p>
+        <p class="hint">Вставьте свой GitHub-токен — один раз на этот браузер. Как его получить — в инструкции для редактора.</p>
+        <div class="ed__login"><input class="field" type="password" id="gh-token" placeholder="github_pat_…" /><button class="btn btn--ink" type="button" id="gh-in">Войти</button></div>`;
+      $('#gh-in').addEventListener('click', async () => {
+        const v = $<HTMLInputElement>('#gh-token').value.trim();
+        if (!v) return;
+        ghToken.set(v);
+        await renderAuth();
+        if (editingId) await loadGame(editingId);
+      });
+      return;
+    }
+    box.innerHTML = '<p class="hint">Проверяем вход…</p>';
+    try {
+      const me = await whoAmI();
+      box.innerHTML = `<p class="label">Вы вошли как ${esc(me.login)}</p>
+        <p class="hint">${me.canWrite ? 'Можно сохранять карточки.' : 'У этого аккаунта нет права записи в репозиторий — попросите владельца добавить вас.'}</p>
+        <button class="link-btn" type="button" id="gh-out">Выйти</button>`;
+      $('#gh-out').addEventListener('click', () => {
+        ghToken.set(null);
+        renderAuth();
+      });
+    } catch (e) {
+      ghToken.set(null);
+      box.innerHTML = `<p class="label">Токен не подошёл</p><p class="hint">${esc((e as Error).message)}</p>`;
+      setTimeout(renderAuth, 2500);
+    }
+  }
+
+  // ───────── Сохранение ─────────
+  const blobToBase64 = (b: Blob) =>
+    new Promise<string>((r) => {
+      const fr = new FileReader();
+      fr.onload = () => r(String(fr.result).split(',')[1]);
+      fr.readAsDataURL(b);
+    });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const out = build();
+    if (out.errors.length) return say(`<b>Не сохранено:</b><br>${out.errors.map(esc).join('<br>')}`, 'err');
+    if (!hasRepo || !ghToken.get()) return say('Сохранение недоступно: войдите через GitHub-токен (справа вверху) или скачайте файл карточки.', 'err');
+    const btn = $<HTMLButtonElement>('#ed-save');
+    btn.disabled = true;
+    const who = modAuth.get()?.name ?? 'редактор на сайте';
+    try {
+      let id = editingId;
+      if (!id) {
+        id = slugify(out.title);
+        let n = 1;
+        while (await fileSha(`src/content/games/${id}/index.md`)) id = `${slugify(out.title)}-${++n}`;
+      }
+      const dir = `src/content/games/${id}`;
+      for (const [tid, name] of out.newTranslators) {
+        say(`Добавляем переводчика «${esc(name)}»…`);
+        await writeFile(`src/content/translators/${tid}.json`, JSON.stringify({ name, url: '' }, null, 2) + '\n', `Новый переводчик: ${name} (${who})`);
+      }
+      if (out.newPublisher) {
+        say(`Добавляем издателя «${esc(out.newPublisher.name)}»…`);
+        await writeFile(`src/content/publishers/${out.newPublisher.id}.json`, JSON.stringify({ name: out.newPublisher.name }, null, 2) + '\n', `Новый издатель: ${out.newPublisher.name} (${who})`);
+      }
+      if (newCover) {
+        say('Загружаем обложку…');
+        await writeFile(`${dir}/cover.${newCover.ext}`, await blobToBase64(newCover.blob), `Обложка: ${out.title} (${who})`, { base64: true });
+      }
+      say('Сохраняем карточку…');
+      await writeFile(`${dir}/index.md`, out.text, `${editingId ? 'Изменено' : 'Добавлено'}: ${out.title} (${who})`, { sha: editingId ? editingSha ?? undefined : null });
+      dirty = false;
+      const isNew = !editingId;
+      editingId = id;
+      editingSha = (await fileSha(`${dir}/index.md`)) ?? null;
+      history.replaceState(null, '', `?game=${id}`);
+      say(`<b>Сохранено.</b> Сайт обновится через 1–2 минуты: <a href="${base}/games/${id}/">${esc(out.title)}</a>.${isNew ? ' Теперь эта страница — правка этой карточки.' : ''}`, 'ok');
+      try { localStorage.removeItem('rp_editor_draft'); } catch {}
+    } catch (err) {
+      const m = err instanceof GhError && err.status === 409
+        ? 'Карточку только что изменил кто-то другой. Обновите страницу, чтобы загрузить свежую версию, и внесите правки ещё раз.'
+        : `Не удалось сохранить: ${esc((err as Error).message)}`;
+      say(m, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('#ed-download').addEventListener('click', () => {
+    const out = build();
+    if (out.errors.length) say(`Файл скачан, но в нём есть недочёты:<br>${out.errors.map(esc).join('<br>')}`, 'err');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([out.text], { type: 'text/markdown' }));
+    a.download = 'index.md';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  // ───────── События ─────────
+  function changed() {
+    dirty = true;
+    renderPreview();
+    if (!editingId) {
+      // черновик новой карточки живёт в браузере, пока её не сохранят
+      try {
+        const g = readForm();
+        localStorage.setItem('rp_editor_draft', JSON.stringify(g));
+      } catch {}
+    }
+  }
+  form.addEventListener('input', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.matches('[data-people-filter]')) {
+      const q = (t as HTMLInputElement).value.trim().toLowerCase();
+      const qs = [q, translit(q)];
+      $$('label.chip', t.nextElementSibling!).forEach((l) => {
+        const name = l.textContent!.toLowerCase();
+        l.hidden = !!q && !qs.some((x) => name.includes(x)) && !$<HTMLInputElement>('input', l).checked;
+      });
+      return;
+    }
+    changed();
+  });
+  form.addEventListener('change', (e) => {
+    const t = e.target as HTMLInputElement;
+    if (t.dataset.f === 'port') ($('[data-port-box]', t.closest('.etr')!) as HTMLElement).hidden = !t.checked;
+    if (t.name === 'publisher') ($('#f-pub-new') as HTMLElement).hidden = t.value !== '__new';
+    changed();
+  });
+  trs.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('[data-del]');
+    if (b && confirm('Удалить этот перевод из карточки?')) {
+      b.closest('.etr')!.remove();
+      renumber();
+      changed();
+    }
+  });
+  $('#tr-add').addEventListener('click', () => {
+    const el = addTranslation();
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    changed();
+  });
+  $$<HTMLButtonElement>('[data-view]').forEach((b) =>
+    b.addEventListener('click', () => {
+      $('.ed__grid').dataset.view = b.dataset.view!;
+      $$('[data-view]').forEach((x) => x.tagName === 'BUTTON' && x.setAttribute('aria-selected', String(x === b)));
+      window.scrollTo({ top: 0 });
+    }),
+  );
+  addEventListener('beforeunload', (e) => {
+    if (dirty && editingId) e.preventDefault();
+  });
+
+  // ───────── Старт ─────────
+  (async () => {
+    await renderAuth();
+    if (editingId) await loadGame(editingId);
+    else {
+      let draft: any = null;
+      try { draft = JSON.parse(localStorage.getItem('rp_editor_draft') || 'null'); } catch {}
+      if (draft?.title || draft?.translations?.some((t: Tr) => t.sourceUrl || t.download || t.moderatorNote)) {
+        fillForm({ ...draft, publisher: draft.publisher }, draft.body ?? '');
+        say(`Восстановлен несохранённый черновик «${esc(draft.title || 'без названия')}». <button type="button" class="link-btn" id="draft-reset">Начать заново</button>`);
+        $('#draft-reset')?.addEventListener('click', () => {
+          localStorage.removeItem('rp_editor_draft');
+          location.reload();
+        });
+      } else addTranslation();
+    }
+    showCover();
+    renderPreview();
+  })();
+</script>
+
+<style>
+  .ed {
+    padding-top: clamp(20px, 3vw, 36px);
+  }
+  .ed__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px 32px;
+    margin-bottom: 1.6rem;
+  }
+  .ed__title {
+    font-size: clamp(1.8rem, 4vw, var(--s4));
+    overflow-wrap: anywhere;
+  }
+  .ed__auth {
+    max-width: 380px;
+    padding: 0.9rem 1rem;
+    box-shadow: var(--sh-sm);
+  }
+  .ed__auth :global(p) {
+    margin: 0 0 0.4rem;
+  }
+  .ed__auth :global(.ed__login) {
+    display: flex;
+    gap: 8px;
+  }
+  .ed__auth :global(.ed__login .field) {
+    padding: 0.5em 0.7em;
+    font-size: 0.9rem;
+  }
+  .ed__tabs {
+    display: none;
+  }
+  .ed__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: clamp(20px, 3vw, 40px);
+    align-items: start;
+  }
+  .ed__form {
+    display: grid;
+    gap: 22px;
+    min-width: 0;
+  }
+  .ed__sec {
+    padding: clamp(16px, 2.2vw, 24px);
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+  .ed__sec:not(.panel) {
+    padding: 0;
+  }
+  .ed__sec-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px 16px;
+  }
+  .ed__h {
+    font-size: var(--s1);
+  }
+  .f {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+  .f2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+  }
+  .f--short {
+    min-height: 4.5rem;
+  }
+  .f--tall {
+    min-height: 10rem;
+  }
+  .field[type='number'] {
+    max-width: 10rem;
+  }
+  .hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ink-2);
+  }
+  .link-btn {
+    padding: 0;
+    font: 600 0.85rem var(--f-body);
+    color: var(--ink-2);
+    background: none;
+    border: 0;
+    border-bottom: 1.5px solid currentColor;
+    cursor: pointer;
+    justify-self: start;
+  }
+  .link-btn:hover {
+    color: var(--red);
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .check input,
+  .chip input[type='checkbox'],
+  .chip input[type='radio'] {
+    accent-color: #15130f;
+  }
+  .check input {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  /* фишки-переключатели */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.38em 0.65em;
+    font: 600 0.88rem/1.1 var(--f-body);
+    background: var(--surface);
+    color: var(--ink);
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+    cursor: pointer;
+    user-select: none;
+  }
+  .chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .chip:has(input:focus-visible) {
+    outline: 3px solid var(--teal);
+    outline-offset: 2px;
+  }
+  .chip:has(input:checked) {
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: 2px 2px 0 var(--teal);
+  }
+  .chip:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 2px 2px 0 var(--shadow-c);
+  }
+  .chip[class*='tag--'] {
+    font-family: var(--f-mono);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #15130f;
+    opacity: 0.55;
+  }
+  .chip.tag--manual { background: var(--t-manual); }
+  .chip.tag--ai-edited { background: var(--t-ai-edited); }
+  .chip.tag--ai { background: var(--t-ai); }
+  .chip.tag--wasted { background: var(--t-wasted); color: #fff; }
+  .chip[class*='tag--']:has(input:checked) {
+    opacity: 1;
+    box-shadow: 3px 3px 0 var(--shadow-c);
+    outline: 2px solid var(--line);
+  }
+  .chip--v {
+    font-family: var(--f-mono);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .chip--gap {
+    border-style: dashed;
+    font-size: 0.82rem;
+  }
+  .chip :global(.ico) {
+    width: 1.1em;
+    height: 1.1em;
+  }
+  .chips--people {
+    max-height: 9.5rem;
+    overflow: auto;
+    padding: 2px;
+  }
+  .f-filter {
+    padding: 0.45em 0.6em;
+    font-size: 0.88rem;
+    border-width: var(--bw-thin);
+    max-width: 280px;
+  }
+
+  /* обложка */
+  .cover-in {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .cover-in__pv {
+    flex: none;
+    width: 96px;
+    aspect-ratio: 4 / 5;
+    display: grid;
+    place-items: center;
+    border: var(--bw-thin) dashed var(--ink-2);
+    border-radius: var(--r-tag);
+    overflow: hidden;
+    font-size: 0.8rem;
+  }
+  .cover-in__pv :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .cover-in > div {
+    display: grid;
+    gap: 8px;
+  }
+  .cover-in label.btn {
+    justify-self: start;
+  }
+
+  /* перевод в анкете */
+  #trs {
+    display: grid;
+    gap: 22px;
+  }
+  :global(.etr) {
+    margin: 0;
+    padding: clamp(14px, 2vw, 22px);
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+    border-width: var(--bw);
+  }
+  :global(.etr__head) {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  :global(.etr__title) {
+    float: left;
+    padding: 0;
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: var(--s1);
+  }
+  :global(.etr__port) {
+    display: grid;
+    gap: 14px;
+    padding: 14px;
+    border-left: 4px solid var(--ink);
+    background: var(--paper);
+  }
+  .ed__add {
+    justify-self: start;
+  }
+  .ed__pub {
+    gap: 12px;
+  }
+  .ed__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-top: 6px;
+  }
+  .ed__msg {
+    font-weight: 500;
+  }
+  .ed__msg:empty {
+    display: none;
+  }
+  .ed__msg.is-ok {
+    padding: 0.7rem 0.9rem;
+    background: color-mix(in srgb, var(--green) 25%, var(--surface));
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+  }
+  .ed__msg.is-err {
+    padding: 0.7rem 0.9rem;
+    background: color-mix(in srgb, var(--red) 18%, var(--surface));
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+  }
+
+  /* предпросмотр */
+  .ed__preview {
+    position: sticky;
+    top: 88px;
+    max-height: calc(100vh - 100px);
+    overflow: auto;
+    display: grid;
+    gap: 16px;
+    padding: 4px 8px 12px 4px;
+    scrollbar-width: thin;
+  }
+  .ed__pv-label {
+    margin: 0;
+  }
+  .pv-card {
+    width: 220px;
+  }
+  .pv-card :global(.gcard__link) {
+    pointer-events: none;
+  }
+  .pv-page {
+    padding: 1rem;
+    display: grid;
+    gap: 10px;
+    box-shadow: var(--sh-sm);
+  }
+  .pv-page :global(.pv-page__title) {
+    font-size: var(--s2);
+    font-weight: 800;
+    overflow-wrap: anywhere;
+  }
+  .pv-page :global(.pv-page__alt) {
+    margin: -4px 0 0;
+    font-size: 0.8rem;
+  }
+  .pv-page :global(.pv-page__sec) {
+    margin: 8px 0 0;
+    padding-bottom: 4px;
+    border-bottom: var(--bw-thin) solid var(--line);
+  }
+  .pv-page :global(.pv-tr) {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    font-size: 0.92rem;
+  }
+  .pv-page :global(.pv-tr__head),
+  .pv-page :global(.pv-tr__state),
+  .pv-page :global(.pv-tr__dl) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .pv-page :global(.pv-tr__dl) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pv-page :global(.pv-tr__dl .btn) {
+    font-size: 0.88rem;
+    pointer-events: none;
+  }
+  .pv-page :global(.pv-tr__host) {
+    font-size: 0.72rem;
+    text-align: center;
+    color: var(--ink-2);
+  }
+  .pv-page :global(.pv-tr p) {
+    margin: 0;
+  }
+  .pv-page :global(.pv-tr__port) {
+    padding: 0.4rem 0.6rem;
+    background: var(--paper);
+    border-left: 4px solid var(--ink);
+    font-weight: 600;
+  }
+  .pv-page :global(.pv-tr .note) {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+  }
+  .pv-page :global(.note--mod) {
+    background: var(--yellow);
+    color: #15130f;
+  }
+  .pv-page :global(.note--mod .note__tab) {
+    background: #15130f;
+    color: var(--yellow);
+  }
+  .pv-page :global(.note--tr) {
+    background: var(--paper);
+  }
+  .pv-page :global(.note--tr .note__tab) {
+    background: var(--teal);
+    color: #15130f;
+  }
+  .pv-page :global(.btn--ghost) {
+    --bg: transparent;
+    --fg: var(--ink-2);
+    border-width: var(--bw-thin);
+    border-color: var(--ink-2);
+    box-shadow: none;
+  }
+  .pv-page :global(.pv-warn) {
+    color: var(--red);
+    font-weight: 700;
+  }
+  .pv-page :global(.pv-page__desc p) {
+    margin: 0 0 0.6em;
+  }
+
+  @media (max-width: 960px) {
+    .ed__tabs {
+      display: flex;
+      position: sticky;
+      top: 62px;
+      z-index: 20;
+      margin-bottom: 16px;
+      border: var(--bw) solid var(--line);
+      border-radius: var(--r-btn);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .ed__tabs button {
+      flex: 1;
+      padding: 0.7em;
+      font: 700 0.85rem var(--f-mono);
+      text-transform: uppercase;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .ed__tabs button[aria-selected='true'] {
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .ed__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ed__grid[data-view='form'] .ed__preview,
+    .ed__grid[data-view='preview'] .ed__form {
+      display: none;
+    }
+    .ed__preview {
+      position: static;
+      max-height: none;
+      overflow: visible;
+    }
+  }
+  @media (max-width: 560px) {
+    .f2 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

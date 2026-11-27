@@ -1,0 +1,98 @@
+---
+import Base from '../../layouts/Base.astro';
+import { Image } from 'astro:assets';
+import { getPosts, u, fmtDate } from '../../lib/util';
+const posts = await getPosts();
+---
+<Base title="Блог" description="Новости архива, разборы переводов и заметки.">
+  <div class="wrap blog">
+    <h1>Блог</h1>
+    <p class="blog__lead">Новости архива, разборы переводов и всё, что не помещается в карточку игры.</p>
+    <ol class="blist">
+      {posts.map((p, i) => (
+        <li>
+          <a class:list={['bpost', { 'bpost--first': i === 0 }]} href={u(`/blog/${p.id}/`)}>
+            {p.data.cover && <Image src={p.data.cover} alt="" widths={[320, 640]} sizes="320px" class="bpost__img" />}
+            <div class="bpost__text">
+              <time class="label muted" datetime={p.data.date.toISOString()}>{fmtDate(p.data.date)}</time>
+              <h2 class="bpost__t">{p.data.title}</h2>
+              {p.data.excerpt && <p class="bpost__ex">{p.data.excerpt}</p>}
+            </div>
+          </a>
+        </li>
+      ))}
+    </ol>
+    {!posts.length && <p>Записей пока нет.</p>}
+  </div>
+</Base>
+<style>
+  .blog {
+    padding-top: clamp(28px, 4vw, 52px);
+    max-width: 980px;
+  }
+  .blog__lead {
+    font-size: var(--s1);
+    max-width: 46ch;
+    margin: 1rem 0 2.5rem;
+  }
+  .blist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 22px;
+  }
+  .bpost {
+    display: flex;
+    gap: 20px;
+    padding: 1.3rem 1.4rem;
+    background: var(--surface);
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-sm);
+    text-decoration: none;
+    transition:
+      transform 0.12s var(--ease),
+      box-shadow 0.12s var(--ease);
+  }
+  .bpost:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--sh);
+  }
+  .bpost:hover .bpost__t {
+    text-decoration: underline;
+    text-decoration-color: var(--ink);
+    text-decoration-thickness: 3px;
+  }
+  .bpost--first {
+    background: var(--teal);
+    color: #15130f;
+  }
+  .bpost--first .muted {
+    color: #15130f;
+  }
+  .bpost :global(.bpost__img) {
+    width: 200px;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+    flex: none;
+  }
+  .bpost__t {
+    font-size: clamp(var(--s1), 2.4vw, var(--s2));
+    margin: 0.4rem 0 0.5rem;
+  }
+  .bpost__ex {
+    margin: 0;
+    max-width: 60ch;
+  }
+  @media (max-width: 600px) {
+    .bpost {
+      flex-direction: column;
+    }
+    .bpost :global(.bpost__img) {
+      width: 100%;
+    }
+  }
+</style>

@@ -1,0 +1,244 @@
+# Настройки админки (Sveltia CMS).
+# ВАЖНО: после создания репозитория на GitHub впишите его в строку repo ниже.
+
+backend:
+  name: github
+  repo: Xe-ga/ruspatch
+  branch: main
+  commit_messages:
+    create: 'Добавлено: {{collection}} «{{slug}}»'
+    update: 'Изменено: {{collection}} «{{slug}}»'
+    delete: 'Удалено: {{collection}} «{{slug}}»'
+    uploadMedia: 'Загружен файл {{path}}'
+    deleteMedia: 'Удалён файл {{path}}'
+
+# Общая папка для картинок, которые вставляют прямо в текст
+media_folder: public/uploads
+public_folder: /uploads
+
+collections:
+  # ───────────── Игры ─────────────
+  - name: games
+    label: Игры
+    label_singular: игру
+    description: Каждая игра — отдельная страница в каталоге.
+    folder: src/content/games
+    path: '{{slug}}/index'
+    media_folder: ''
+    public_folder: ''
+    slug: '{{title}}'
+    identifier_field: title
+    summary: '{{title}} — {{platform}}'
+    sortable_fields: [date, title, platform]
+    create: true
+    fields:
+      - { name: title, label: Название, widget: string, hint: 'Как на коробке или в англоязычной версии' }
+      - name: altTitles
+        label: Другие названия
+        widget: list
+        required: false
+        hint: 'Японское, европейское название и т.п. — по ним тоже работает поиск'
+        field: { name: name, label: Название, widget: string }
+      - name: platform
+        label: Платформа
+        widget: select
+        options:
+          - { label: 'Game Boy', value: gb }
+          - { label: 'Game Boy Advance', value: gba }
+          - { label: 'Nintendo DS', value: nds }
+          - { label: 'Nintendo 3DS', value: 3ds }
+          - { label: 'NES / Famicom', value: nes }
+          - { label: 'Super Nintendo / Super Famicom', value: snes }
+          - { label: 'Nintendo 64', value: n64 }
+          - { label: 'PlayStation Portable', value: psp }
+          - { label: 'PlayStation Vita', value: vita }
+          - { label: 'PlayStation', value: ps1 }
+          - { label: 'Sega Mega Drive / Genesis', value: megadrive }
+          - { label: 'Sega CD / Mega-CD', value: segacd }
+          - { label: 'Sega Dreamcast', value: dreamcast }
+          - { label: 'PC Engine / TurboGrafx-16', value: pce }
+          - { label: 'NEC PC-98', value: pc98 }
+          - { label: 'Windows 95', value: win95 }
+      - name: publisher
+        label: Издатель
+        widget: relation
+        collection: publishers
+        value_field: '{{slug}}'
+        search_fields: [name]
+        display_fields: [name]
+        required: false
+        hint: 'Нет нужного? Сначала добавьте его в разделе «Издатели»'
+      - { name: developer, label: Разработчик, widget: string, required: false }
+      - { name: year, label: Год выхода игры, widget: number, value_type: int, min: 1970, max: 2100, required: false }
+      - name: genres
+        label: Жанры
+        widget: select
+        multiple: true
+        required: false
+        options: [RPG, JRPG, Экшен, Платформер, Приключения, Квест, Визуальная новелла, Стратегия, Тактика, Головоломка, Файтинг, Шутер, Гонки, Спорт, Симулятор, Хоррор, Ритм]
+      - { name: cover, label: Обложка, widget: image, required: false, hint: 'JPG или PNG. Сайт сам уменьшит и сожмёт картинку' }
+      - name: translations
+        label: Переводы
+        label_singular: перевод
+        widget: list
+        min: 1
+        collapsed: false
+        summary: '{{fields.type}} · {{fields.verdict}}'
+        hint: 'Если у игры несколько переводов — добавьте каждый. Порядок не важен: сайт сам отсортирует их по рекомендации.'
+        fields:
+          - name: type
+            label: Тип перевода
+            widget: select
+            options:
+              - { label: '🟩 Ручной', value: manual }
+              - { label: '🟨 Нейросеть + правки', value: ai-edited }
+              - { label: '🟧 Нейросетевой', value: ai }
+              - { label: '🟥 Потрачено (плохой, почти неиграбельный)', value: wasted }
+          - name: status
+            label: Состояние перевода
+            widget: select
+            default: full
+            options:
+              - { label: '✔ Полный', value: full }
+              - { label: '◐ Частичный', value: partial }
+              - { label: '⏳ В процессе', value: wip }
+          - { name: updating, label: Обновляется, widget: boolean, default: false, required: false, hint: 'Автор продолжает выпускать правки. Можно ставить вместе с «Полный»' }
+          - name: gaps
+            label: Что не переведено
+            widget: select
+            multiple: true
+            required: false
+            hint: 'Можно выбрать несколько. Даже у полного перевода могут быть, например, ролики без субтитров'
+            options:
+              - { label: 'Без перевода графики', value: graphics }
+              - { label: 'DLC не переведены', value: dlc }
+              - { label: 'Ролики без перевода', value: video }
+              - { label: 'Без перевода озвучки', value: audio }
+          - name: gapsCustom
+            label: Свои отметки «что не переведено»
+            widget: list
+            required: false
+            hint: 'Если нужной отметки нет в списке: «часть интерфейса», «надписи на картах»'
+            field: { name: item, label: Отметка, widget: string }
+          - { name: statusNote, label: Сноска к состоянию, widget: string, required: false, hint: 'Коротко, что именно не так: «не переведены главы 5–7», «переведено 60% текста». На сайте — со звёздочкой' }
+          - name: verdict
+            label: Рекомендация модератора
+            widget: select
+            required: false
+            hint: 'Насколько советуем играть с этим переводом. Пусто = «Не проверено». На сайте переводы идут от лучшей рекомендации к худшей'
+            options:
+              - { label: '■■■■ Отлично — рекомендуем', value: great }
+              - { label: '■■■□ Хорошо — мелкие огрехи не мешают', value: good }
+              - { label: '■■□□ Играбельно — есть косяки, но в целом не плохо', value: ok }
+              - { label: '■□□□ Терпимо — играть можно, но тяжело', value: no }
+              - { label: '□□□□ Не проверено', value: untested }
+          - { name: verdictLabel, label: Своё название рекомендации, widget: string, required: false, hint: 'Необязательно. Например, для ■□□□: «Через боль», «На любителя», «Только для фанатов». Пусто — стандартное название. Уровень (квадратики и сортировка) остаётся тот же' }
+          - { name: verdictNote, label: Почему такая рекомендация, widget: string, required: false, hint: 'Одна-две фразы своими словами: «Хорошо — пара опечаток в меню, сюжет без ошибок». Пусто — стандартное пояснение. Особенно важно для ■□□□: объясните, что именно плохо' }
+          - name: translators
+            label: Переводчики
+            widget: relation
+            collection: translators
+            value_field: '{{slug}}'
+            search_fields: [name]
+            display_fields: [name]
+            multiple: true
+            required: false
+            hint: 'Нет нужного? Сначала добавьте его в разделе «Переводчики». После публикации не меняйте состав — оценки перевода к нему привязаны'
+          - { name: port, label: Это порт, widget: boolean, default: false, required: false, hint: 'Готовый перевод перенесён на другую версию игры. Тогда в «Переводчиках» — авторы оригинального перевода, а ниже — портировщики' }
+          - name: porters
+            label: Портировщики
+            widget: relation
+            collection: translators
+            value_field: '{{slug}}'
+            search_fields: [name]
+            display_fields: [name]
+            multiple: true
+            required: false
+            hint: 'Только для порта: кто переносил перевод'
+          - { name: portFrom, label: Откуда порт, widget: string, required: false, hint: 'Только для порта: «с японской версии», «с версии для SNES»' }
+          - { name: originalUrl, label: Ссылка на оригинальный перевод, widget: string, required: false, hint: 'Только для порта' }
+          - { name: sourceUrl, label: Ссылка на ресурс переводчика, widget: string, required: false, hint: 'Сайт, форум или канал переводчика, где лежит перевод. Будет главной кнопкой «Скачать у переводчика»' }
+          - { name: download, label: Ссылка на пост в нашем Telegram-канале, widget: string, required: false, hint: 'Нужна хотя бы одна из двух ссылок' }
+          - name: moderator
+            label: Модератор
+            widget: relation
+            collection: moderators
+            value_field: '{{slug}}'
+            search_fields: [name]
+            display_fields: [name]
+            required: false
+            hint: 'Кто поставил рекомендацию и написал комментарий. Его имя видно при наведении на рекомендацию'
+          - { name: moderatorNote, label: Комментарий модератора, widget: text, required: false }
+          - { name: translatorNote, label: Комментарий переводчика, widget: text, required: false, hint: 'Пусто — блок не появится. У порта подписывается именем первого портировщика' }
+          - { name: date, label: Дата добавления перевода, widget: datetime, required: false }
+      - { name: date, label: Дата публикации / обновления, widget: datetime, hint: 'По ней игра попадает в «Свежие переводы» — обновите при добавлении нового перевода' }
+      - { name: draft, label: Черновик (не показывать на сайте), widget: boolean, default: false, required: false }
+      - { name: body, label: Описание игры, widget: markdown }
+
+  # ───────────── Блог ─────────────
+  - name: blog
+    label: Блог
+    label_singular: запись
+    folder: src/content/blog
+    path: '{{slug}}/index'
+    media_folder: ''
+    public_folder: ''
+    slug: '{{year}}-{{month}}-{{day}}-{{title}}'
+    identifier_field: title
+    create: true
+    sortable_fields: [date, title]
+    fields:
+      - { name: title, label: Заголовок, widget: string }
+      - { name: date, label: Дата, widget: datetime }
+      - { name: excerpt, label: Короткое описание, widget: text, required: false, hint: 'Одна-две фразы для списка записей' }
+      - { name: cover, label: Картинка, widget: image, required: false }
+      - { name: draft, label: Черновик, widget: boolean, default: false, required: false }
+      - { name: body, label: Текст, widget: markdown }
+
+  # ───────────── Справочники ─────────────
+  - name: translators
+    label: Переводчики
+    label_singular: переводчика
+    folder: src/content/translators
+    extension: json
+    format: json
+    media_folder: ''
+    public_folder: ''
+    slug: '{{name}}'
+    identifier_field: name
+    create: true
+    fields:
+      - { name: name, label: Имя или ник, widget: string }
+      - { name: url, label: Ссылка (Telegram, сайт…), widget: string, required: false }
+      - { name: avatar, label: Аватар, widget: image, required: false, hint: 'Квадратная картинка. Нет — будут инициалы' }
+
+  - name: moderators
+    label: Модераторы
+    label_singular: модератора
+    description: 'Страница модератора: кто он и как проверяет переводы. Ключи для удаления комментариев задаются отдельно, в Supabase.'
+    folder: src/content/moderators
+    extension: md
+    format: frontmatter
+    media_folder: ''
+    public_folder: ''
+    slug: '{{name}}'
+    identifier_field: name
+    create: true
+    fields:
+      - { name: name, label: Имя или ник, widget: string }
+      - { name: avatar, label: Аватар, widget: image, required: false }
+      - { name: tagline, label: Одной строкой, widget: string, required: false, hint: '«Проверяю JRPG и всё на PC-98»' }
+      - { name: url, label: Ссылка, widget: string, required: false }
+      - { name: body, label: О себе и о том, как проверяю переводы, widget: markdown, required: false }
+
+  - name: publishers
+    label: Издатели
+    label_singular: издателя
+    folder: src/content/publishers
+    extension: json
+    format: json
+    slug: '{{name}}'
+    identifier_field: name
+    create: true
+    fields:
+      - { name: name, label: Название, widget: string }

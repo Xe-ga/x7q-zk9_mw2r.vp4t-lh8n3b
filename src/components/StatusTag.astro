@@ -1,0 +1,23 @@
+---
+import { STATUSES, GAPS, UPDATING, type Status, type Gap } from '../data/taxonomy';
+import { u } from '../lib/util';
+import Icon from './Icon.astro';
+interface Props { status: Status; updating?: boolean; gaps?: Gap[]; custom?: string[]; note?: string | null; big?: boolean; link?: boolean; showNote?: boolean; hideFull?: boolean }
+const { status, updating = false, gaps = [], custom = [], note, big = false, link = false, showNote = false, hideFull = false } = Astro.props;
+const s = STATUSES[status];
+const Tag = link ? 'a' : 'span';
+const marked = !!note && !showNote; // сноска есть, но показана не здесь — ставим звёздочку
+---
+{!(hideFull && status === 'full') && (
+  <Tag class:list={['status', `status--${status}`, { 'status--big': big }]} title={note ? `${s.hint}. ${note}` : s.hint} href={link ? u(`/search/?status=${status}`) : undefined}>
+    <Icon name={s.icon} />{s.label}{marked && <sup>*</sup>}
+  </Tag>
+)}
+{updating && (
+  <Tag class:list={['status status--upd', { 'status--big': big }]} title={UPDATING.hint} href={link ? u('/search/?status=updating') : undefined}>
+    <Icon name={UPDATING.icon} />{UPDATING.label}
+  </Tag>
+)}
+{gaps.map((g) => <span class="gap" title={GAPS[g]}>{GAPS[g]}</span>)}
+{custom.filter((c) => c.trim()).map((c) => <span class="gap">{c.trim()}</span>)}
+{showNote && note && <p class="status-note"><b aria-hidden="true">*</b> {note}</p>}
