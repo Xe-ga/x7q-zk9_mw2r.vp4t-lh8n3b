@@ -30,10 +30,13 @@ const right: Item[] = [
   <div class:list={['decor', side ? 'decor--r' : 'decor--l']} aria-hidden="true">
     {items.map((it) =>
       it.kind === 'icon' ? (
-        <span
+        <img
           class="decor__ico"
-          style={`--src:url('${u(`/icons/platforms/${it.slug}.svg`)}');--s:${it.size}px;--r:${it.rot}deg;--x:${it.x}px`}
-        ></span>
+          src={u(`/icons/platforms/${it.slug}.svg`)}
+          alt=""
+          loading="lazy"
+          style={`--s:${it.size}px;--r:${it.rot}deg;--x:${it.x}px`}
+        />
       ) : (
         <span class="decor__dots" style={`--w:${it.w}px;--h:${it.h}px;--x:${it.x}px`}></span>
       ),
@@ -65,18 +68,29 @@ const right: Item[] = [
       display: flex;
     }
   }
-  /* как иконка на обложке-заглушке: тёмный силуэт, чуть повёрнутый, полупрозрачный */
+  /* как иконка на обложке-заглушке: тёмный силуэт, чуть повёрнутый, полупрозрачный.
+     Картинкой, а не маской: у повёрнутой маски браузер рисует тонкие линии по краям. */
   .decor__ico {
     display: block;
     flex: none;
     width: min(var(--s), 100%);
+    height: auto;
     aspect-ratio: 1;
+    object-fit: contain;
     margin-left: var(--x);
-    background: var(--ink);
-    opacity: 0.14;
+    opacity: 0.12;
+    filter: brightness(0); /* исходные иконки белые — делаем чёрными */
     transform: rotate(var(--r));
-    -webkit-mask: var(--src) center / contain no-repeat;
-    mask: var(--src) center / contain no-repeat;
+  }
+  :global(:root[data-theme='dark']) .decor__ico {
+    filter: none;
+    opacity: 0.1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .decor__ico {
+      filter: none;
+      opacity: 0.1;
+    }
   }
   /* растр из точек */
   .decor__dots {

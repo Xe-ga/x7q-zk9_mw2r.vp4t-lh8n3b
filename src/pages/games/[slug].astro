@@ -100,64 +100,49 @@ const one = trs[0];
       </div>
       {trs.map((t) => (
         <article class="tcard" id={`t-${t.idx}`}>
-          <header class="tcard__head">
-            {t.port && <span class="tag tag--port tag--big" title="Перенос готового перевода на другую версию игры">Порт</span>}
-            <TypeTag type={t.type} big link />
-            <VerdictTag verdict={t.verdict} label={t.verdictLabel} note={t.verdictNote} by={t.mod?.name} big link />
-            {t.date && <span class="label muted tcard__date">добавлен {fmtDate(t.date)}</span>}
-          </header>
-          <p class="tcard__hint muted">
-            {t.verdictNote?.trim() ? <span class="tcard__why">{t.verdictNote.trim().replace(/\.$/, '')}.</span> : <>{VERDICTS[verdictOf(t)].hint}.</>}
-            {t.verdict && t.verdict !== 'untested' && t.mod && (
-              <a class="modpill" href={u(`/moderators/${t.mod.id}/`)} title={`Рекомендацию поставил модератор ${t.mod.name}`}><Icon name="user" />{t.mod.name}</a>
-            )}
-          </p>
-          <div class="tcard__state">
-            <StatusTag status={t.status} updating={t.updating} gaps={t.gaps} custom={t.gapsCustom} note={t.statusNote} showNote big link />
-          </div>
-          {t.port && t.originalUrl && (
-            <p class="tcard__port">
-              <a href={t.originalUrl} rel="noopener" target="_blank">Оригинальный перевод <Icon name="external-link" /></a>
-            </p>
-          )}
-          <p class="tcard__who">
-            <span class="label muted">{t.port ? 'Перевод оригинала' : t.people.length > 1 ? 'Переводчики' : 'Переводчик'}</span>
-            {t.people.length === 0 && <span class="muted">не указан</span>}
-            {t.people.map((p, i) => (
-              <span class="tcard__person">
-                <a href={u(`/translators/${p.id}/`)} title={`Страница переводчика ${p.name}: все переводы и отзывы`}>{p.name}</a>{i < t.people.length - 1 && ','}
-              </span>
-            ))}
-          </p>
-          {t.port && (
-            <p class="tcard__who">
-              <span class="label muted">{t.porters.length > 1 ? 'Портировщики' : 'Портировщик'}</span>
-              {t.porters.length === 0 && <span class="muted">не указан</span>}
-              {t.porters.map((p, i) => (
-                <span class="tcard__person">
-                  <a href={u(`/translators/${p.id}/`)} title={`Страница ${p.name}: все переводы и отзывы`}>{p.name}</a>{i < t.porters.length - 1 && ','}
-                </span>
-              ))}
-            </p>
-          )}
-
-          <div class="tcard__body">
-            <div class="tcard__notes">
-              {t.moderatorNote && (
-                <section class="note note--mod">
-                  <span class="note__tab label">Модератор{t.mod && <>: <a class="note__who" href={u(`/moderators/${t.mod.id}/`)} title={`Кто такой ${t.mod.name} и как проверяет переводы`}>{t.mod.name}</a></>}</span>
-                  <p>{t.moderatorNote}</p>
-                </section>
+          <div class="tcard__top">
+            <div class="tcard__info">
+              <header class="tcard__head">
+                {t.port && <span class="tag tag--port tag--big" title="Перенос готового перевода на другую версию игры">Порт</span>}
+                <TypeTag type={t.type} big link />
+                <VerdictTag verdict={t.verdict} label={t.verdictLabel} note={t.verdictNote} by={t.mod?.name} big link />
+                {t.date && <span class="label muted tcard__date">добавлен {fmtDate(t.date)}</span>}
+              </header>
+              <p class="tcard__hint muted">
+                {t.verdictNote?.trim() ? <span class="tcard__why">{t.verdictNote.trim().replace(/\.$/, '')}.</span> : <>{VERDICTS[verdictOf(t)].hint}.</>}
+                {t.verdict && t.verdict !== 'untested' && t.mod && (
+                  <a class="modpill" href={u(`/moderators/${t.mod.id}/`)} title={`Рекомендацию поставил модератор ${t.mod.name}`}><Icon name="user" />{t.mod.name}</a>
+                )}
+              </p>
+              <div class="tcard__state">
+                <StatusTag status={t.status} updating={t.updating} gaps={t.gaps} custom={t.gapsCustom} note={t.statusNote} showNote big link />
+              </div>
+              {t.port && t.originalUrl && (
+                <p class="tcard__port">
+                  <a href={t.originalUrl} rel="noopener" target="_blank">Оригинальный перевод <Icon name="external-link" /></a>
+                </p>
               )}
-              {t.translatorNote && (
-                <section class="note note--tr">
-                  <span class="note__tab label">{t.port && t.porters[0] ? `От портировщика: ${t.porters[0].name}` : `От переводчика${t.people[0] ? `: ${t.people[0].name}` : ''}`}</span>
-                  <p>{t.translatorNote}</p>
-                </section>
+              <p class="tcard__who">
+                <span class="label muted">{t.port ? 'Перевод оригинала' : t.people.length > 1 ? 'Переводчики' : 'Переводчик'}</span>
+                {t.people.length === 0 && <span class="muted">не указан</span>}
+                {t.people.map((p) => (
+                  <span class="tcard__person">
+                    <a class="person" href={u(`/translators/${p.id}/`)} title={`Страница переводчика ${p.name}: все переводы и отзывы`}><Icon name="user" />{p.name}</a>
+                  </span>
+                ))}
+              </p>
+              {t.port && (
+                <p class="tcard__who">
+                  <span class="label muted">{t.porters.length > 1 ? 'Портировщики' : 'Портировщик'}</span>
+                  {t.porters.length === 0 && <span class="muted">не указан</span>}
+                  {t.porters.map((p) => (
+                    <span class="tcard__person">
+                      <a class="person" href={u(`/translators/${p.id}/`)} title={`Страница ${p.name}: все переводы и отзывы`}><Icon name="user" />{p.name}</a>
+                    </span>
+                  ))}
+                </p>
               )}
-              {!t.moderatorNote && !t.translatorNote && <p class="tcard__empty muted">Комментариев к этому переводу пока нет.</p>}
             </div>
-
             <div class="tcard__side">
               <div class="dl">
                 {t.sourceUrl && (
@@ -175,6 +160,22 @@ const one = trs[0];
               <Rating gameId={game.id} tkey={t.key} allKeys={keys} />
             </div>
           </div>
+          {(t.moderatorNote || t.translatorNote) && (
+            <div class="tcard__notes">
+              {t.moderatorNote && (
+                <section class="note note--mod">
+                  <span class="note__tab label">Модератор{t.mod && <>: <a class="note__who" href={u(`/moderators/${t.mod.id}/`)} title={`Кто такой ${t.mod.name} и как проверяет переводы`}>{t.mod.name}</a></>}</span>
+                  <p>{t.moderatorNote}</p>
+                </section>
+              )}
+              {t.translatorNote && (
+                <section class="note note--tr">
+                  <span class="note__tab label">{t.port && t.porters[0] ? `От портировщика: ${t.porters[0].name}` : `От переводчика${t.people[0] ? `: ${t.people[0].name}` : ''}`}</span>
+                  <p>{t.translatorNote}</p>
+                </section>
+              )}
+            </div>
+          )}
         </article>
       ))}
     </section>
@@ -365,9 +366,9 @@ const one = trs[0];
   .tcard__who {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.4em 0.7em;
-    margin: 0.9rem 0 0;
+    align-items: center;
+    gap: 0.5em 0.7em;
+    margin: 1.1rem 0 0;
     font-weight: 600;
   }
   .tcard__person {
@@ -391,23 +392,56 @@ const one = trs[0];
     color: #15130f;
     border-color: var(--line);
   }
-  .tcard__body {
+  /* сверху: теги и переводчики слева, скачивание и оценка справа */
+  .tcard__top {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 330px;
     gap: clamp(20px, 3.5vw, 48px);
     align-items: start;
-    margin-top: 1.2rem;
-    padding-top: 1.2rem;
+  }
+  .tcard__info {
+    min-width: 0;
+  }
+  /* ниже, на всю ширину: комментарии модератора и переводчика */
+  .tcard__notes {
+    margin-top: 1.4rem;
+    padding-top: 0.6rem;
     border-top: var(--bw-thin) dashed var(--ink-2);
+  }
+  /* плашка переводчика: крупная и заметная */
+  .person {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: 0.4em 0.85em;
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--ink);
+    background: var(--paper);
+    border: var(--bw) solid var(--line);
+    border-radius: 999px;
+    box-shadow: 3px 3px 0 var(--shadow-c);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .person :global(.ico) {
+    width: 1em;
+    height: 1em;
+    flex: none;
+  }
+  .person:hover {
+    background: var(--yellow);
+    color: #15130f;
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 var(--shadow-c);
   }
   .tcard__notes .note:first-child {
     margin-top: 0.95rem;
   }
   .tcard__notes .note + .note {
     margin-top: 1.9rem;
-  }
-  .tcard__empty {
-    margin: 0;
   }
   .tcard__side {
     display: flex;
@@ -470,7 +504,7 @@ const one = trs[0];
   }
 
   @media (max-width: 860px) {
-    .tcard__body {
+    .tcard__top {
       grid-template-columns: 1fr;
     }
     .tcard__date {

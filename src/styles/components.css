@@ -370,7 +370,8 @@
 .modbar__x {
   padding: 0.5em;
 }
-body.has-modbar {
+/* место под панель модератора — внутри тёмного подвала, а не светлой полосой под ним */
+body.has-modbar .site-foot {
   padding-bottom: 72px;
 }
 
