@@ -376,15 +376,15 @@ const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.
     overflow: hidden;
     margin-bottom: clamp(28px, 4vw, 44px);
   }
-  /* обложка тянется на всю высоту карточки, но не ниже пропорции коробки (300×375) */
+  /* обложка тянется на всю высоту карточки, но не ниже квадрата 300×300 */
   .feat__cover {
     position: relative;
     display: block;
-    min-height: 375px;
+    min-height: 300px;
     border-right: var(--bw) solid var(--line);
     background: var(--paper-2);
   }
-  .feat__cover :global(.cover-img),
+  .feat__cover :global(.cover-box),
   .feat__cover :global(.cover-fallback) {
     position: absolute;
     inset: 0;

@@ -34,7 +34,8 @@
 }
 .gcard__cover {
   position: relative;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1;
+  overflow: hidden;
   border-bottom: var(--bw) solid var(--line);
   background: var(--paper-2);
 }
@@ -88,11 +89,29 @@
   background: var(--surface);
 }
 
-/* ---------- Обложка ---------- */
-.cover-img {
+/* ---------- Обложка ----------
+   Рамки обложек квадратные. Квадратная обложка занимает рамку целиком,
+   вертикальная или широкая встаёт целиком по центру, а поля заполняет её же размытая копия. */
+.cover-box {
+  position: relative;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  overflow: hidden;
+  background: var(--paper-2);
+}
+.cover-box::before {
+  content: '';
+  position: absolute;
+  inset: -15%;
+  background: var(--bg) center / cover no-repeat;
+  filter: blur(16px) saturate(1.15) brightness(0.82);
+}
+.cover-img {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .cover-fallback {
   position: relative;

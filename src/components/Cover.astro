@@ -1,5 +1,5 @@
 ---
-import { Image } from 'astro:assets';
+import { Image, getImage } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import { PLATFORM_BY_SLUG } from '../data/platforms';
 import Icon from './Icon.astro';
@@ -8,9 +8,13 @@ const { cover, title, platform, widths = [240, 360, 480], sizes = '(max-width: 6
 const FALLBACK = ['var(--teal)', 'var(--yellow)', 'var(--magenta)', 'var(--orange)', 'var(--sky)', 'var(--green)'];
 const idx = [...platform].reduce((a, c) => a + c.charCodeAt(0), 0) % FALLBACK.length;
 const p = PLATFORM_BY_SLUG[platform];
+// крошечная копия обложки для размытого фона: им заполняются поля, если обложка не квадратная
+const blur = cover ? (await getImage({ src: cover, width: 32, format: 'webp' })).src : null;
 ---
 {cover ? (
-  <Image src={cover} alt={`Обложка: ${title}`} widths={widths} sizes={sizes} loading={eager ? 'eager' : 'lazy'} class="cover-img" />
+  <div class="cover-box" style={`--bg:url('${blur}')`}>
+    <Image src={cover} alt={`Обложка: ${title}`} widths={widths} sizes={sizes} loading={eager ? 'eager' : 'lazy'} class="cover-img" />
+  </div>
 ) : (
   <div class="cover-fallback" style={`--fb:${FALLBACK[idx]}`} role="img" aria-label={`Нет обложки: ${title}`}>
     <Icon name={platform} platform class="cover-fallback__ico" />
