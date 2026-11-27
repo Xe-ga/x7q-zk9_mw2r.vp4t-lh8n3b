@@ -12,7 +12,7 @@ export const SITE = {
 // Впишите после создания репозитория, например: 'ivan/ruspatch'.
 // Пока пусто — редактор работает, но вместо сохранения предлагает скачать файл карточки.
 export const REPO = {
-  name: 'Xe-ga/ruspatch',
+  name: 'Xe-ga/x7q-zk9_mw2r.vp4t-lh8n3b',
   branch: 'main',
 };
 

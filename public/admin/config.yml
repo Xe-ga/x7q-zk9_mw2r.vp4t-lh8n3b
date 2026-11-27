@@ -3,7 +3,7 @@
 
 backend:
   name: github
-  repo: Xe-ga/ruspatch
+  repo: Xe-ga/x7q-zk9_mw2r.vp4t-lh8n3b
   branch: main
   commit_messages:
     create: 'Добавлено: {{collection}} «{{slug}}»'
