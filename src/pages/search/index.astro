@@ -10,7 +10,12 @@ const games = await getGames();
 const { translators, publishers } = await getLookups();
 const used = <T,>(arr: T[]) => [...new Set(arr)];
 const platforms = PLATFORMS.filter((p) => games.some((g) => g.data.platform === p.slug));
-const genres = GENRES.filter((x) => games.some((g) => g.data.genres.includes(x)));
+// стандартные жанры в привычном порядке, потом свои — по алфавиту
+const usedGenres = new Set(games.flatMap((g) => g.data.genres));
+const genres = [
+  ...GENRES.filter((x) => usedGenres.has(x)),
+  ...[...usedGenres].filter((x) => !(GENRES as readonly string[]).includes(x)).sort((a, b) => a.localeCompare(b, 'ru')),
+];
 const trIds = used(games.flatMap((g) => g.data.translations.flatMap((t) => [...t.translators, ...t.porters].map((x) => x.id)))).sort((a, b) => translators[a].name.localeCompare(translators[b].name, 'ru'));
 const pubIds = used(games.flatMap((g) => (g.data.publisher ? [g.data.publisher.id] : []))).sort((a, b) => publishers[a].name.localeCompare(publishers[b].name, 'ru'));
 const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.data.publisher.id]?.name : undefined);

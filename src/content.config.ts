@@ -2,7 +2,7 @@ import { defineCollection, reference } from 'astro:content';
 import { z } from 'astro/zod';
 import { glob } from 'astro/loaders';
 import { PLATFORM_SLUGS } from './data/platforms';
-import { TRANSLATION_TYPE_KEYS, VERDICT_KEYS, STATUS_KEYS, GAP_KEYS, GENRES } from './data/taxonomy';
+import { TRANSLATION_TYPE_KEYS, VERDICT_KEYS, STATUS_KEYS, GAP_KEYS } from './data/taxonomy';
 
 const optUrl = z.url().optional().nullable().or(z.literal(''));
 const optText = z.string().optional().nullable();
@@ -46,7 +46,7 @@ const games = defineCollection({
       publisher: reference('publishers').optional().nullable(),
       developer: optText,
       year: z.number().int().min(1970).max(2100).optional().nullable(),
-      genres: z.array(z.enum(GENRES)).default([]),
+      genres: z.array(z.string()).default([]), // стандартные из GENRES + свои, добавленные модераторами
       cover: image().optional().nullable(),
       translations: z.array(translation).min(1),
       date: z.coerce.date(),

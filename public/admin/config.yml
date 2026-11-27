@@ -72,10 +72,10 @@ collections:
       - { name: year, label: Год выхода игры, widget: number, value_type: int, min: 1970, max: 2100, required: false }
       - name: genres
         label: Жанры
-        widget: select
-        multiple: true
+        widget: list
         required: false
-        options: [RPG, JRPG, Экшен, Платформер, Приключения, Квест, Визуальная новелла, Стратегия, Тактика, Головоломка, Файтинг, Шутер, Гонки, Спорт, Симулятор, Хоррор, Ритм]
+        hint: 'По одному в строке. Обычные: RPG, JRPG, Экшен, Платформер, Приключения, Квест, Визуальная новелла, Стратегия, Тактика, Головоломка, Файтинг, Шутер, Гонки, Спорт, Симулятор, Хоррор, Ритм. Можно вписать свой'
+        field: { name: genre, label: Жанр, widget: string }
       - { name: cover, label: Обложка, widget: image, required: false, hint: 'JPG или PNG. Сайт сам уменьшит и сожмёт картинку' }
       - name: translations
         label: Переводы

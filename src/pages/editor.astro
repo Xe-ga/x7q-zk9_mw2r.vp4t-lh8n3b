@@ -22,6 +22,10 @@ const translators = (await getCollection('translators')).map((t) => ({ id: t.id,
 const publishers = (await getCollection('publishers')).map((p) => ({ id: p.id, name: p.data.name })).sort(sortByName);
 const moderators = (await getCollection('moderators')).map((m) => ({ id: m.id, name: m.data.name })).sort(sortByName);
 // свои отметки «что не переведено», которые уже кто-то использовал, — общий список для всех модераторов
+// свои жанры, которые уже кто-то добавлял
+const customGenres = [...new Set(games.flatMap((g) => g.data.genres))]
+  .filter((g) => !(GENRES as readonly string[]).includes(g))
+  .sort((a, b) => a.localeCompare(b, 'ru'));
 const customGaps = [...new Set(games.flatMap((g) => g.data.translations.flatMap((t) => t.gapsCustom.map((x) => x.trim()))))]
   .filter(Boolean)
   .sort((a, b) => a.localeCompare(b, 'ru'));
@@ -102,11 +106,17 @@ const DATA = {
           </div>
           <div class="f">
             <span class="label">Жанры <span class="opt">необязательно</span></span>
-            <div class="chips">
-              {GENRES.map((g) => (
+            <div class="chips" id="f-genres">
+              {[...GENRES, ...customGenres].map((g) => (
                 <label class="chip"><input type="checkbox" name="genres" value={g} />{g}</label>
               ))}
+              <button type="button" class="chip chip--add" id="genre-add">+ свой жанр</button>
             </div>
+            <div class="gap-new" id="genre-new" hidden>
+              <input class="field" id="genre-input" placeholder="Например: Метроидвания" maxlength="30" />
+              <button type="button" class="btn btn--sm btn--ink" id="genre-save">Добавить</button>
+            </div>
+            <p class="hint">Новый жанр после сохранения карточки появится в этом списке у всех модераторов и в фильтрах каталога.</p>
           </div>
           <div class="f">
             <span class="label">Обложка <span class="opt">необязательно</span></span>
@@ -356,6 +366,42 @@ const DATA = {
       ($('[data-del]', el) as HTMLButtonElement).hidden = $$('.etr', trs).length < 2;
     });
   }
+  // Свой жанр: такая же фишка, как стандартные
+  function ensureGenreChip(name: string) {
+    name = name.trim();
+    const box = $('#f-genres');
+    if (!name) return null;
+    const have = $$<HTMLInputElement>('input[name=genres]', box).find((i) => i.value.toLowerCase() === name.toLowerCase());
+    if (have) return have;
+    const lab = $('label.chip', box).cloneNode(true) as HTMLLabelElement;
+    const cb = $<HTMLInputElement>('input', lab);
+    cb.value = name;
+    cb.checked = false;
+    lab.replaceChildren(cb, document.createTextNode(name));
+    box.insertBefore(lab, $('#genre-add'));
+    return cb;
+  }
+  function saveGenre() {
+    const inp = $<HTMLInputElement>('#genre-input');
+    const cb = ensureGenreChip(inp.value);
+    if (!cb) return;
+    cb.checked = true;
+    inp.value = '';
+    ($('#genre-new') as HTMLElement).hidden = true;
+    changed();
+  }
+  $('#genre-add').addEventListener('click', () => {
+    ($('#genre-new') as HTMLElement).hidden = false;
+    $<HTMLInputElement>('#genre-input').focus();
+  });
+  $('#genre-save').addEventListener('click', saveGenre);
+  $('#genre-input').addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') {
+      e.preventDefault();
+      saveGenre();
+    }
+  });
+
   // Своя отметка «что не переведено»: фишка добавляется во все переводы и в шаблон новых
   function ensureGapChip(name: string) {
     name = name.trim();
@@ -525,6 +571,7 @@ const DATA = {
     set('publisher', fm.publisher ?? '');
     set('developer', fm.developer);
     set('body', body.trim());
+    for (const g of fm.genres ?? []) ensureGenreChip(g);
     $$<HTMLInputElement>('input[name=genres]').forEach((i) => (i.checked = (fm.genres ?? []).includes(i.value)));
     (form.elements.namedItem('draft') as HTMLInputElement).checked = !!fm.draft;
     trs.innerHTML = '';
