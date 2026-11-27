@@ -155,7 +155,6 @@ collections:
             multiple: true
             required: false
             hint: 'Только для порта: кто переносил перевод'
-          - { name: portFrom, label: Откуда порт, widget: string, required: false, hint: 'Только для порта: «с японской версии», «с версии для SNES»' }
           - { name: originalUrl, label: Ссылка на оригинальный перевод, widget: string, required: false, hint: 'Только для порта' }
           - { name: sourceUrl, label: Ссылка на ресурс переводчика, widget: string, required: false, hint: 'Сайт, форум или канал переводчика, где лежит перевод. Будет главной кнопкой «Скачать у переводчика»' }
           - { name: download, label: Ссылка на пост в нашем Telegram-канале, widget: string, required: false, hint: 'Нужна хотя бы одна из двух ссылок' }

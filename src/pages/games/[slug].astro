@@ -115,10 +115,9 @@ const one = trs[0];
           <div class="tcard__state">
             <StatusTag status={t.status} updating={t.updating} gaps={t.gaps} custom={t.gapsCustom} note={t.statusNote} showNote big link />
           </div>
-          {t.port && (
+          {t.port && t.originalUrl && (
             <p class="tcard__port">
-              Порт{t.portFrom && <> {t.portFrom}</>}.
-              {t.originalUrl && <a href={t.originalUrl} rel="noopener" target="_blank">Оригинальный перевод <Icon name="external-link" /></a>}
+              <a href={t.originalUrl} rel="noopener" target="_blank">Оригинальный перевод <Icon name="external-link" /></a>
             </p>
           )}
           <p class="tcard__who">

@@ -12,7 +12,6 @@ translations:
     translators: [test-translator]
     port: true
     porters: [puchevachi]
-    portFrom: "с японской версии Rockman World"
     originalUrl: https://example.org/rockman-world-rus
     download: https://t.me/example/104
     translatorNote: "Перенёс перевод с японской версии на английскую, заодно перевёл заставку и титры."
