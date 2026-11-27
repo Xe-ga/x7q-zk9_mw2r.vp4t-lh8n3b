@@ -105,7 +105,7 @@ const groups = [
 
   type Item = {
     id: string; t: string; a: string[]; p: string; ty: string[]; vl: string | null; st: string[]; sn: string | null; pt: boolean; up: boolean; v: (string | null)[]; n: number; tr: string[]; pu: string | null;
-    dev: string | null; g: string[]; y: number | null; d: string; c: string | null;
+    dev: string | null; g: string[]; y: number | null; d: string; c: string | null; cf: boolean;
   };
   type Doc = Item & { fields: { text: string; tri: Set<string>; w: number }[]; acr: string };
 
@@ -143,7 +143,7 @@ const groups = [
   function card(it: Item) {
     const idx = [...it.p].reduce((a, c) => a + c.charCodeAt(0), 0) % FB.length;
     const cover = it.c
-      ? `<div class="cover-box" style="--bg:url('${it.c}')"><img class="cover-img" src="${it.c}" alt="Обложка: ${esc(it.t)}" loading="lazy"></div>`
+      ? `<div class="cover-box${it.cf ? ' cover-box--fill' : ''}" style="--bg:url('${it.c}')"><img class="cover-img" src="${it.c}" alt="Обложка: ${esc(it.t)}" loading="lazy"></div>`
       : `<div class="cover-fallback" style="--fb:${FB[idx]}" role="img" aria-label="Нет обложки: ${esc(it.t)}">${icon('platforms', it.p, 'cover-fallback__ico')}<span class="cover-fallback__title">${esc(it.t)}</span></div>`;
     const meta = [it.y, it.pu ? names.publishers[it.pu] : null].filter(Boolean).join(' · ');
     const ty = it.ty[0];

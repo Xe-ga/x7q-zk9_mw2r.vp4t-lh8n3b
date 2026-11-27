@@ -3,6 +3,7 @@ import { Image, getImage } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import { PLATFORM_BY_SLUG } from '../data/platforms';
 import Icon from './Icon.astro';
+import { isNearSquare } from '../lib/cover';
 interface Props { cover?: ImageMetadata | null; title: string; platform: string; widths?: number[]; sizes?: string; eager?: boolean }
 const { cover, title, platform, widths = [240, 360, 480], sizes = '(max-width: 600px) 50vw, 260px', eager = false } = Astro.props;
 const FALLBACK = ['var(--teal)', 'var(--yellow)', 'var(--magenta)', 'var(--orange)', 'var(--sky)', 'var(--green)'];
@@ -12,7 +13,7 @@ const p = PLATFORM_BY_SLUG[platform];
 const blur = cover ? (await getImage({ src: cover, width: 32, format: 'webp' })).src : null;
 ---
 {cover ? (
-  <div class="cover-box" style={`--bg:url('${blur}')`}>
+  <div class:list={['cover-box', { 'cover-box--fill': isNearSquare(cover.width, cover.height) }]} style={`--bg:url('${blur}')`}>
     <Image src={cover} alt={`Обложка: ${title}`} widths={widths} sizes={sizes} loading={eager ? 'eager' : 'lazy'} class="cover-img" />
   </div>
 ) : (

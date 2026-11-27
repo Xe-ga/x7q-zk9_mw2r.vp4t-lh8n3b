@@ -2,6 +2,7 @@
 import type { APIRoute } from 'astro';
 import { getImage } from 'astro:assets';
 import { getGames, getLookups, rankedTranslations, verdictOf } from '../lib/util';
+import { isNearSquare } from '../lib/cover';
 
 export const GET: APIRoute = async () => {
   const games = await getGames();
@@ -32,6 +33,7 @@ export const GET: APIRoute = async () => {
         y: d.year ?? null,
         d: d.date.toISOString().slice(0, 10),
         c: cover,
+        cf: d.cover ? isNearSquare(d.cover.width, d.cover.height) : false,
       };
     }),
   );

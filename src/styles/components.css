@@ -113,6 +113,10 @@
   height: 100%;
   object-fit: contain;
 }
+/* почти квадратная обложка (коробки DS и 3DS) — во всю рамку, чуть срезая края */
+.cover-box--fill .cover-img {
+  object-fit: cover;
+}
 .cover-fallback {
   position: relative;
   width: 100%;
