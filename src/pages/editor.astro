@@ -482,7 +482,8 @@ const DATA = {
     const v = D.verdicts[k];
     const name = (k !== 'untested' && t.verdictLabel) || v.label;
     const meter = `<span class="vmeter vmeter--${k}"${mini ? ` role="img" title="Рекомендация: ${esc(name)}"` : ' aria-hidden="true"'}>${[1, 2, 3, 4].map((i) => `<i${i <= v.level ? ' class="on"' : ''}></i>`).join('')}</span>`;
-    return mini ? meter : `<span class="verdict verdict--${k}">${meter}${esc(name)}</span>`;
+    const star = t.verdictNote?.trim() ? '<sup class="verdict__star">*</sup>' : '';
+    return mini ? meter : `<span class="verdict verdict--${k}" title="${esc(t.verdictNote?.trim() || v.hint)}">${meter}${esc(name)}${star}</span>`;
   }
   function statusHtml(t: Tr, withGaps = false) {
     let h = '';
@@ -524,15 +525,14 @@ const DATA = {
         const people = peopleNames(t.translators, t.translatorsNew);
         const porters = peopleNames(t.porters, t.portersNew);
         const mod = t.moderator ? nameOf(D.moderators, t.moderator) : '';
-        const hint = t.verdictNote ? `<b>${esc(t.verdictNote.replace(/\.$/, ''))}.</b>` : `${esc(D.verdicts[vOf(t)].hint)}.`;
+        const chip = (n: string) => `<span class="pv-person">${icon('ui', 'user')}${esc(n)}</span>`;
         const sourceHost = (() => { try { return new URL(t.sourceUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })();
         return `<article class="pv-tr">
-          <div class="pv-tr__head">${t.port ? '<span class="tag tag--port">Порт</span>' : ''}<span class="tag tag--${t.type}">${esc(D.types[t.type]?.label ?? '')}</span>${verdictHtml(t)}</div>
-          <p class="pv-tr__hint">${hint}${mod && t.verdict && t.verdict !== 'untested' ? ` <span class="modpill">${icon('ui', 'user')}${esc(mod)}</span>` : ''}</p>
+          <div class="pv-tr__head">${t.port ? '<span class="tag tag--port">Порт</span>' : ''}<span class="tag tag--${t.type}">${esc(D.types[t.type]?.label ?? '')}</span>${verdictHtml(t)}${mod && t.verdict && t.verdict !== 'untested' ? `<span class="modpill">${icon('ui', 'user')}${esc(mod)}</span>` : ''}</div>
           <div class="pv-tr__state">${statusHtml(t, true)}${t.statusNote ? `<p class="status-note"><b>*</b> ${esc(t.statusNote)}</p>` : ''}</div>
           ${t.port && t.originalUrl ? `<p class="pv-tr__port"><u>Оригинальный перевод</u> ↗</p>` : ''}
-          <p class="pv-tr__who"><span class="label muted">${t.port ? 'Перевод оригинала' : 'Переводчик'}</span> ${people.length ? people.map((p) => `<u>${esc(p)}</u>`).join(', ') : '<span class="muted">не указан</span>'}</p>
-          ${t.port ? `<p class="pv-tr__who"><span class="label muted">Портировщик</span> ${porters.map((p) => `<u>${esc(p)}</u>`).join(', ') || '<span class="muted">не указан</span>'}</p>` : ''}
+          <p class="pv-tr__who"><span class="label muted">${t.port ? 'Перевод оригинала' : 'Переводчик'}</span> ${people.length ? people.map(chip).join(' ') : '<span class="muted">не указан</span>'}</p>
+          ${t.port ? `<p class="pv-tr__who"><span class="label muted">Портировщик</span> ${porters.map(chip).join(' ') || '<span class="muted">не указан</span>'}</p>` : ''}
           ${t.moderatorNote ? `<section class="note note--mod"><span class="note__tab label">Модератор${mod ? ': ' + esc(mod) : ''}</span><p>${esc(t.moderatorNote)}</p></section>` : ''}
           ${t.translatorNote ? `<section class="note note--tr"><span class="note__tab label">${t.port && porters[0] ? 'От портировщика: ' + esc(porters[0]) : 'От переводчика' + (people[0] ? ': ' + esc(people[0]) : '')}</span><p>${esc(t.translatorNote)}</p></section>` : ''}
           <div class="pv-tr__dl">
@@ -1558,6 +1558,28 @@ const DATA = {
     font-size: 0.72rem;
     text-align: center;
     color: var(--ink-2);
+  }
+  /* плашка переводчика — как на странице игры */
+  .pv-page :global(.pv-person) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.3em 0.75em;
+    font-weight: 800;
+    background: var(--paper);
+    border: var(--bw) solid var(--line);
+    border-radius: 999px;
+    box-shadow: 2px 2px 0 var(--shadow-c);
+  }
+  .pv-page :global(.pv-person .ico) {
+    width: 0.95em;
+    height: 0.95em;
+  }
+  .pv-page :global(.pv-tr__who) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4em 0.6em;
   }
   .pv-page :global(.pv-tr p) {
     margin: 0;

@@ -370,6 +370,11 @@ a.verdict:hover {
   box-shadow: 2px 2px 0 var(--teal);
   transform: translate(-1px, -1px);
 }
+.verdict__star {
+  margin-left: -0.4em; /* вплотную к названию, как у сноски */
+  font-size: 0.9em;
+  line-height: 0;
+}
 .verdict--big {
   font-size: 0.92rem;
   padding: 0.42em 0.8em 0.42em 0.6em;
