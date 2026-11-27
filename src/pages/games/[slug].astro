@@ -71,8 +71,8 @@ const one = trs[0];
             <>
               {one.port && <span class="tag tag--port tag--big" title="Перенос готового перевода на другую версию игры">Порт</span>}
               <TypeTag type={one.type} big link />
-              <StatusTag status={one.status} updating={one.updating} note={one.statusNote} big link />
               <VerdictTag verdict={one.verdict} label={one.verdictLabel} note={one.verdictNote} by={one.mod?.name} big link />
+              <StatusTag status={one.status} updating={one.updating} note={one.statusNote} big link />
             </>
           )}
         </div>
@@ -105,7 +105,6 @@ const one = trs[0];
               <header class="tcard__head">
                 {t.port && <span class="tag tag--port tag--big" title="Перенос готового перевода на другую версию игры">Порт</span>}
                 <TypeTag type={t.type} big link />
-                <StatusTag status={t.status} updating={t.updating} gaps={t.gaps} custom={t.gapsCustom} note={t.statusNote} big link />
                 <span class="tcard__verdict">
                   <VerdictTag verdict={t.verdict} label={t.verdictLabel} note={t.verdictNote} by={t.mod?.name} big link />
                   {t.verdict && t.verdict !== 'untested' && t.mod && (
@@ -114,7 +113,9 @@ const one = trs[0];
                 </span>
                 {t.date && <span class="label muted tcard__date">добавлен {fmtDate(t.date)}</span>}
               </header>
-              {t.statusNote && <p class="status-note tcard__snote"><b aria-hidden="true">*</b> {t.statusNote}</p>}
+              <div class="tcard__state">
+                <StatusTag status={t.status} updating={t.updating} gaps={t.gaps} custom={t.gapsCustom} note={t.statusNote} showNote big link />
+              </div>
               {t.port && t.originalUrl && (
                 <p class="tcard__port">
                   <a href={t.originalUrl} rel="noopener" target="_blank">Оригинальный перевод <Icon name="external-link" /></a>
@@ -403,8 +404,17 @@ const one = trs[0];
     align-items: center;
     gap: 6px;
   }
-  .tcard__snote {
-    margin: 0.6rem 0 0;
+  /* вторая строка: полный / частичный, «обновляется», что не переведено, сноска */
+  .tcard__state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .tcard__state :global(.status-note) {
+    flex-basis: 100%;
+    margin: 0;
   }
   /* плашка переводчика: крупная и заметная */
   .person {
