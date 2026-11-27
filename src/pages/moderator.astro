@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import { u } from '../lib/util';
 import { PLATFORMS } from '../data/platforms';
 const platNames = JSON.stringify(Object.fromEntries(PLATFORMS.map((p) => [p.slug, p.name])));
 ---
@@ -9,6 +10,7 @@ const platNames = JSON.stringify(Object.fromEntries(PLATFORMS.map((p) => [p.slug
     <p class="mod__lead">
       У каждого модератора свой ключ. После входа ключ сохранится в этом браузере: у комментариев появится кнопка
       «Удалить», ваши комментарии будут подписаны вашим именем, а ниже появятся присланные переводы.
+      Впервые здесь — прочитайте <a href={u('/guide/')}>шпаргалку модератора</a>.
     </p>
     <form class="mod__form panel" id="mod-form">
       <label class="label" for="mod-key">Ключ</label>
@@ -29,7 +31,7 @@ const platNames = JSON.stringify(Object.fromEntries(PLATFORMS.map((p) => [p.slug
         </div>
       </div>
       <p class="muted inbox__how">
-        Принятый перевод нужно добавить в архив вручную через админку (/admin/). Отметка «Принят» здесь —
+        Принятый перевод нужно добавить в архив вручную — кнопкой «Новая игра» на панели внизу. Отметка «Принят» здесь —
         просто чтобы другие модераторы не взялись за него второй раз.
       </p>
       <ol class="inbox__list" id="inbox-list"></ol>

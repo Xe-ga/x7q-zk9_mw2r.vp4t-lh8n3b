@@ -119,6 +119,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       {edit && <a class="modbar__btn modbar__btn--main" href={editUrl(edit)}><Icon name="pen" />Изменить эту страницу</a>}
       <a class="modbar__btn" href={u('/editor/')}><Icon name="tag" />Новая игра</a>
       <a class="modbar__btn" href={u('/moderator/')}><Icon name="comments" />Заявки</a>
+      <a class="modbar__btn" href={u('/guide/')}><Icon name="info-circle" />Шпаргалка</a>
       <a class="modbar__btn" href={u('/admin/index.html')}><Icon name="cog" />Админка</a>
       <button class="modbar__btn modbar__x" type="button" id="modbar-hide" aria-label="Скрыть панель"><Icon name="times" /></button>
     </aside>
