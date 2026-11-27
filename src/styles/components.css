@@ -376,6 +376,7 @@ body.has-modbar {
 
 /* ---------- Подвал ---------- */
 .site-foot {
+  position: relative;
   margin-top: clamp(64px, 9vw, 120px);
   /* подвал всегда тёмный, в обеих темах */
   background: #15130f;
@@ -415,6 +416,18 @@ body.has-modbar {
   padding-block: 16px 22px;
   font-size: 0.82rem;
   opacity: 0.7;
+}
+/* зубчатый край над подвалом */
+.site-foot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+  background:
+    linear-gradient(-45deg, #15130f 8.5px, transparent 0) 0 100% / 24px 12px repeat-x,
+    linear-gradient(45deg, #15130f 8.5px, transparent 0) 0 100% / 24px 12px repeat-x;
 }
 @media (max-width: 720px) {
   .site-foot__grid {

@@ -50,6 +50,12 @@ const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.
       </a>
     </div>
 
+    <div class="shelf-wrap">
+    <span class="shelf-dots" aria-hidden="true"></span>
+    <svg class="shelf-star" viewBox="0 0 60 60" aria-hidden="true">
+      <polygon points="35,5 40,25 60,30 40,35 35,55 30,35 10,30 30,25" fill="#15130f" />
+      <polygon points="30,0 35,20 55,25 35,30 30,50 25,30 5,25 25,20" fill="var(--yellow)" stroke="#15130f" stroke-width="3" stroke-linejoin="round" />
+    </svg>
     <aside class="shelf panel" aria-labelledby="shelf-h">
       <div class="shelf__head">
         <h2 id="shelf-h" class="label">Платформы</h2>
@@ -67,6 +73,7 @@ const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.
         ))}
       </ul>
     </aside>
+    </div>
   </section>
 
   {featured && (
@@ -244,6 +251,29 @@ const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.
     font-weight: 800;
     font-size: 1.4rem;
   }
+  .shelf-wrap {
+    position: relative;
+    isolation: isolate;
+  }
+  /* растр из точек за блоком платформ — как печать на старой коробке */
+  .shelf-dots {
+    position: absolute;
+    z-index: -1;
+    right: -26px;
+    bottom: -30px;
+    width: 62%;
+    height: 70%;
+    background: radial-gradient(color-mix(in srgb, var(--ink) 38%, transparent) 2px, transparent 2.4px) 0 0 / 12px 12px;
+  }
+  .shelf-star {
+    position: absolute;
+    z-index: 2;
+    left: -22px;
+    top: -18px;
+    width: 52px;
+    height: 52px;
+    transform: rotate(-12deg);
+  }
   .shelf {
     padding: 0;
     overflow: hidden;
@@ -346,11 +376,18 @@ const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.
     overflow: hidden;
     margin-bottom: clamp(28px, 4vw, 44px);
   }
+  /* обложка тянется на всю высоту карточки, но не ниже пропорции коробки (300×375) */
   .feat__cover {
+    position: relative;
     display: block;
+    min-height: 375px;
     border-right: var(--bw) solid var(--line);
-    aspect-ratio: 4 / 5;
     background: var(--paper-2);
+  }
+  .feat__cover :global(.cover-img),
+  .feat__cover :global(.cover-fallback) {
+    position: absolute;
+    inset: 0;
   }
   .feat__body {
     padding: clamp(20px, 3vw, 36px);
@@ -452,12 +489,17 @@ const pubName = (g: (typeof games)[number]) => (g.data.publisher ? publishers[g.
     .dice {
       transform: none;
     }
+    .shelf-dots,
+    .shelf-star {
+      display: none;
+    }
   }
   @media (max-width: 760px) {
     .feat {
       grid-template-columns: 1fr;
     }
     .feat__cover {
+      min-height: 0;
       border-right: 0;
       border-bottom: var(--bw) solid var(--line);
       aspect-ratio: 16 / 10;
