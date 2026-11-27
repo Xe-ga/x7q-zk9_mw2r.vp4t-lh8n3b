@@ -1,0 +1,832 @@
+---
+// Редактор записей блога прямо на сайте: слева текст, справа живой предпросмотр.
+// Сохраняет в GitHub так же, как редактор карточек игр.
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Icon from '../../components/Icon.astro';
+import { REPO } from '../../config';
+
+// Исходники записей — чтобы открыть запись на правку даже без входа в GitHub
+const raw = import.meta.glob('/src/content/blog/*/index.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+const sources = Object.fromEntries(Object.entries(raw).map(([p, text]) => [p.split('/').at(-2), text]));
+const posts = (await getCollection('blog'))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .map((p) => ({ id: p.id, title: p.data.title, draft: p.data.draft }));
+
+const DATA = { base: import.meta.env.BASE_URL, repo: REPO, sources, posts };
+---
+<Base title="Редактор блога" noindex>
+  <div class="wrap ed" id="ed">
+    <script type="application/json" id="ed-data" set:html={JSON.stringify(DATA)} />
+
+    <header class="ed__head">
+      <div>
+        <p class="label muted" id="ed-mode">Новая запись</p>
+        <h1 class="ed__title">Блог</h1>
+        <label class="ed__open">
+          <span class="label muted">Открыть запись</span>
+          <select class="field" id="ed-open">
+            <option value="">— новая запись —</option>
+            {posts.map((p) => <option value={p.id}>{p.title}{p.draft ? ' (черновик)' : ''}</option>)}
+          </select>
+        </label>
+      </div>
+      <div class="ed__auth panel" id="ed-auth"></div>
+    </header>
+
+    <div class="ed__tabs" role="tablist" aria-label="Вид">
+      <button type="button" role="tab" aria-selected="true" data-view="form">Текст</button>
+      <button type="button" role="tab" aria-selected="false" data-view="preview">Предпросмотр</button>
+    </div>
+
+    <div class="ed__grid" data-view="form">
+      <form class="ed__form" id="ed-form" novalidate autocomplete="off">
+        <section class="ed__sec panel">
+          <label class="f">
+            <span class="label">Заголовок</span>
+            <input class="field" name="title" required placeholder="Например: Вышел перевод Mother 3" />
+          </label>
+          <label class="f">
+            <span class="label">Короткое описание</span>
+            <textarea class="field f--short" name="excerpt" placeholder="Одна-две фразы: их видно в списке записей и на главной"></textarea>
+          </label>
+
+          <div class="f">
+            <span class="label">Картинка над текстом</span>
+            <div class="cover-in" id="cover-drop">
+              <div class="cover-in__pv" id="cover-pv"></div>
+              <div>
+                <label class="btn btn--sm" for="f-cover"><Icon name="upload" />Выбрать картинку</label>
+                <input id="f-cover" type="file" accept="image/*" class="sr-only" />
+                <p class="hint">Или перетащите её сюда. Можно не добавлять.</p>
+                <button type="button" class="link-btn" id="cover-clear" hidden>Убрать картинку</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="f">
+            <span class="label">Текст</span>
+            <div class="mdbar" role="toolbar" aria-label="Оформление текста">
+              <button type="button" data-md="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button>
+              <button type="button" data-md="italic" title="Курсив (Ctrl+I)"><i>К</i></button>
+              <button type="button" data-md="h2" title="Подзаголовок">H</button>
+              <button type="button" data-md="ul" title="Список">• Список</button>
+              <button type="button" data-md="quote" title="Цитата">❝ Цитата</button>
+              <button type="button" data-md="link" title="Ссылка (Ctrl+K)">Ссылка</button>
+              <label class="mdbar__img" title="Вставить картинку в текст"><Icon name="upload" />Картинка<input type="file" accept="image/*" id="body-img" class="sr-only" /></label>
+            </div>
+            <textarea class="field f--body" name="body" id="f-body" placeholder="Пишите как обычно. Пустая строка — новый абзац.
+Картинку можно вставить прямо сюда через Ctrl+V или перетащить мышкой."></textarea>
+            <p class="hint" id="body-err" hidden></p>
+          </div>
+
+          <div class="f2">
+            <label class="f">
+              <span class="label">Дата</span>
+              <input class="field" type="date" name="date" />
+            </label>
+            <label class="check ed__draft"><input type="checkbox" name="draft" />Черновик — пока не показывать на сайте</label>
+          </div>
+        </section>
+
+        <section class="ed__sec panel">
+          <div class="ed__actions">
+            <button type="submit" class="btn btn--primary btn--big" id="ed-save"><Icon name="upload" />Сохранить</button>
+            <button type="button" class="link-btn ed__del" id="ed-del" hidden>Удалить запись</button>
+          </div>
+          <div class="ed__msg" id="ed-msg" role="status" aria-live="polite"></div>
+        </section>
+      </form>
+
+      <aside class="ed__preview" aria-label="Предпросмотр">
+        <p class="label muted">Так запись будет выглядеть на сайте</p>
+        <article class="pv panel" id="pv"></article>
+      </aside>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { parse as parseYaml, stringify as toYaml } from 'yaml';
+  import { marked } from 'marked';
+  import { hasRepo, ghToken, whoAmI, readFile, writeFile, fileSha, listDir, deleteFile, GhError } from '../../scripts/github';
+  import { modAuth } from '../../scripts/backend';
+  import { translit } from '../../scripts/trigram';
+
+  const D = JSON.parse(document.getElementById('ed-data')!.textContent!);
+  const base = String(D.base).replace(/\/$/, '');
+  const $ = <T extends HTMLElement = HTMLElement>(s: string, r: ParentNode = document) => r.querySelector(s) as T;
+  const $$ = <T extends HTMLElement = HTMLElement>(s: string, r: ParentNode = document) => [...r.querySelectorAll(s)] as T[];
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  const slugify = (s: string) =>
+    translit(s.toLowerCase()).normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'zapis';
+  const rawUrl = (id: string, file: string) => `https://raw.githubusercontent.com/${D.repo.name}/${D.repo.branch}/src/content/blog/${id}/${file}`;
+  const DRAFT_KEY = 'rp_blog_draft';
+
+  const form = $<HTMLFormElement>('#ed-form');
+  const body = $<HTMLTextAreaElement>('#f-body');
+  const msg = $('#ed-msg');
+  const field = (n: string) => form.elements.namedItem(n) as HTMLInputElement;
+
+  let editingId: string | null = new URLSearchParams(location.search).get('post');
+  let editingSha: string | null = null;
+  let orig: Record<string, any> = {};
+  let cover: { blob: Blob; ext: string; url: string } | null = null; // новая картинка над текстом
+  let coverRemoved = false;
+  const images = new Map<string, { blob: Blob; url: string }>(); // новые картинки в тексте: имя файла → картинка
+  let dirty = false;
+
+  // ───────── Картинки ─────────
+  async function shrink(file: Blob, max = 1600): Promise<{ blob: Blob; ext: string }> {
+    const img = await createImageBitmap(file);
+    const k = Math.min(1, max / Math.max(img.width, img.height));
+    const gif = file.type === 'image/gif';
+    if (gif || (k === 1 && file.size < 700_000)) return { blob: file, ext: (file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg') };
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k);
+    c.height = Math.round(img.height * k);
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const blob: Blob = await new Promise((r) => c.toBlob((b) => r(b!), 'image/jpeg', 0.88));
+    return { blob, ext: 'jpg' };
+  }
+  function showCover() {
+    const url = cover?.url ?? (!coverRemoved && editingId && orig.cover ? rawUrl(editingId, String(orig.cover).replace(/^\.\//, '')) : null);
+    $('#cover-pv').innerHTML = url ? `<img src="${esc(url)}" alt="">` : '<span class="muted">нет</span>';
+    $('#cover-clear').hidden = !url;
+  }
+  async function setCover(file: File) {
+    if (!file.type.startsWith('image/')) return bodyProblem('Это не картинка. Подойдут JPG, PNG, WEBP, GIF.');
+    const { blob, ext } = await shrink(file);
+    if (cover) URL.revokeObjectURL(cover.url);
+    cover = { blob, ext, url: URL.createObjectURL(blob) };
+    coverRemoved = false;
+    showCover();
+    changed();
+  }
+  $<HTMLInputElement>('#f-cover').addEventListener('change', (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0];
+    if (f) setCover(f);
+    (e.target as HTMLInputElement).value = '';
+  });
+  $('#cover-clear').addEventListener('click', () => {
+    if (cover) URL.revokeObjectURL(cover.url);
+    cover = null;
+    coverRemoved = true;
+    showCover();
+    changed();
+  });
+
+  function bodyProblem(text: string) {
+    const p = $('#body-err');
+    p.textContent = text;
+    p.hidden = !text;
+  }
+  /** Картинка в текст: вставляется строкой ![](./имя.jpg) там, где стоит курсор. */
+  async function insertImage(file: File) {
+    if (!file.type.startsWith('image/')) return bodyProblem('Это не картинка. Подойдут JPG, PNG, WEBP, GIF.');
+    bodyProblem('');
+    const { blob, ext } = await shrink(file);
+    const name = `img-${Date.now().toString(36)}.${ext}`;
+    images.set(name, { blob, url: URL.createObjectURL(blob) });
+    const before = body.value.slice(0, body.selectionStart);
+    const pre = before && !before.endsWith('\n\n') ? (before.endsWith('\n') ? '\n' : '\n\n') : '';
+    insertAt(`${pre}![](./${name})\n\n`);
+  }
+  function insertAt(text: string, selectFrom?: number, selectTo?: number) {
+    const s = body.selectionStart, e = body.selectionEnd;
+    body.focus();
+    body.setRangeText(text, s, e, 'end');
+    if (selectFrom != null) body.setSelectionRange(s + selectFrom, s + (selectTo ?? selectFrom));
+    changed();
+  }
+  $<HTMLInputElement>('#body-img').addEventListener('change', (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0];
+    if (f) insertImage(f);
+    (e.target as HTMLInputElement).value = '';
+  });
+
+  // Ctrl+V: в тексте — картинка в текст, в остальных местах — картинка над текстом
+  document.addEventListener('paste', (e) => {
+    const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+    if (!file) return;
+    e.preventDefault();
+    if (document.activeElement === body) insertImage(file);
+    else setCover(file);
+  });
+  // перетаскивание: на текст — в текст, на остальное — над текстом
+  const hasFiles = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes('Files');
+  addEventListener('dragover', (e) => {
+    if (hasFiles(e)) e.preventDefault();
+  });
+  addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const f = e.dataTransfer!.files[0];
+    if (!f) return;
+    if ((e.target as HTMLElement).closest('#f-body')) {
+      body.focus();
+      insertImage(f);
+    } else setCover(f);
+  });
+
+  // ───────── Кнопки оформления ─────────
+  function wrap(left: string, right = left, placeholder = 'текст') {
+    const s = body.selectionStart, e = body.selectionEnd;
+    const sel = body.value.slice(s, e) || placeholder;
+    insertAt(left + sel + right, left.length, left.length + sel.length);
+  }
+  function linePrefix(prefix: string) {
+    const s = body.selectionStart;
+    const lineStart = body.value.lastIndexOf('\n', s - 1) + 1;
+    const e = body.selectionEnd;
+    const lines = body.value.slice(lineStart, e).split('\n').map((l) => prefix + l).join('\n');
+    body.setSelectionRange(lineStart, e);
+    insertAt(lines);
+  }
+  const actions: Record<string, () => void> = {
+    bold: () => wrap('**'),
+    italic: () => wrap('*'),
+    h2: () => linePrefix('## '),
+    ul: () => linePrefix('- '),
+    quote: () => linePrefix('> '),
+    link: () => {
+      const url = prompt('Адрес ссылки (https://…)');
+      if (url) wrap('[', `](${url.trim()})`, 'текст ссылки');
+    },
+  };
+  $$<HTMLButtonElement>('[data-md]').forEach((b) => b.addEventListener('click', () => actions[b.dataset.md!]()));
+  body.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = { b: 'bold', i: 'italic', k: 'link' }[e.key.toLowerCase()];
+    if (k) {
+      e.preventDefault();
+      actions[k]();
+    }
+  });
+
+  // ───────── Предпросмотр ─────────
+  marked.setOptions({ gfm: true, breaks: false });
+  const fmtDate = (d: string) => {
+    const dt = d ? new Date(d) : new Date();
+    return dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+  function imgUrl(src: string) {
+    const name = src.replace(/^\.\//, '');
+    if (images.has(name)) return images.get(name)!.url;
+    if (/^\.\//.test(src) && editingId) return rawUrl(editingId, name);
+    return src;
+  }
+  function renderPreview() {
+    const title = field('title').value.trim();
+    const excerpt = field('excerpt').value.trim();
+    const text = body.value.replace(/(!\[[^\]]*\]\()(\.\/[^)\s]+)/g, (_, a, src) => a + imgUrl(src));
+    const coverUrl = cover?.url ?? (!coverRemoved && editingId && orig.cover ? rawUrl(editingId, String(orig.cover).replace(/^\.\//, '')) : null);
+    $('#pv').innerHTML = `
+      <p class="label muted">Блог / ${esc(fmtDate(field('date').value))}${field('draft').checked ? ' · <span class="pv__draft">черновик</span>' : ''}</p>
+      <h1 class="pv__t">${esc(title) || '<span class="muted">Заголовок</span>'}</h1>
+      ${excerpt ? `<p class="pv__lead">${esc(excerpt)}</p>` : ''}
+      ${coverUrl ? `<img class="pv__cover" src="${esc(coverUrl)}" alt="">` : ''}
+      <div class="prose">${text.trim() ? marked.parse(text) : '<p class="muted">Здесь появится текст записи.</p>'}</div>`;
+  }
+
+  // ───────── Загрузка записи ─────────
+  function splitMd(text: string) {
+    const m = text.replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (!m) throw new Error('Не удалось прочитать файл записи');
+    return { fm: (parseYaml(m[1]) ?? {}) as Record<string, any>, body: m[2] };
+  }
+  const toDateInput = (v: unknown) => {
+    const d = v instanceof Date ? v : v ? new Date(String(v)) : new Date();
+    return isNaN(+d) ? '' : new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  };
+  function fill(fm: Record<string, any>, text: string) {
+    field('title').value = fm.title ?? '';
+    field('excerpt').value = fm.excerpt ?? '';
+    field('date').value = toDateInput(fm.date);
+    field('draft').checked = !!fm.draft;
+    body.value = text.trim();
+  }
+  async function loadPost(id: string) {
+    let text: string | null = null;
+    if (hasRepo && ghToken.get()) {
+      try {
+        const f = await readFile(`src/content/blog/${id}/index.md`);
+        if (f) {
+          text = f.text;
+          editingSha = f.sha;
+        }
+      } catch {}
+    }
+    text ??= D.sources[id] ?? null;
+    if (!text) {
+      say(`Запись «${esc(id)}» не найдена — открыта пустая.`, 'err');
+      editingId = null;
+      return;
+    }
+    const { fm, body: b } = splitMd(text);
+    orig = fm;
+    fill(fm, b);
+    $('#ed-mode').textContent = 'Правка записи';
+    $('#ed-del').hidden = false;
+    $<HTMLSelectElement>('#ed-open').value = id;
+  }
+
+  // ───────── Сохранение ─────────
+  function say(html: string, kind: 'ok' | 'err' | '' = '') {
+    msg.className = `ed__msg ${kind ? 'is-' + kind : ''}`;
+    msg.innerHTML = html;
+  }
+  const blobToBase64 = (b: Blob) =>
+    new Promise<string>((r) => {
+      const fr = new FileReader();
+      fr.onload = () => r(String(fr.result).split(',')[1]);
+      fr.readAsDataURL(b);
+    });
+  function build() {
+    const title = field('title').value.trim();
+    const errors: string[] = [];
+    if (!title) errors.push('Не заполнен заголовок.');
+    if (!body.value.trim()) errors.push('Нет текста записи.');
+    const day = field('date').value;
+    // дату храним с временем: при правке старой записи время сохраняется, у новой — текущее
+    let date: string;
+    const origDate = orig.date instanceof Date ? orig.date : orig.date ? new Date(String(orig.date)) : null;
+    if (origDate && toDateInput(origDate) === day) date = origDate.toISOString();
+    else if (day) {
+      const now = new Date();
+      const [y, m, d] = day.split('-').map(Number);
+      date = new Date(y, m - 1, d, now.getHours(), now.getMinutes()).toISOString();
+    } else date = new Date().toISOString();
+    const fm: Record<string, any> = { title, date };
+    const excerpt = field('excerpt').value.trim();
+    if (excerpt) fm.excerpt = excerpt;
+    const coverPath = cover ? `./cover.${cover.ext}` : coverRemoved ? '' : orig.cover ?? '';
+    if (coverPath) fm.cover = coverPath;
+    if (field('draft').checked) fm.draft = true;
+    return { errors, title, text: `---\n${toYaml(fm, { lineWidth: 0 })}---\n${body.value.trim()}\n` };
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const out = build();
+    if (out.errors.length) return say(`<b>Не сохранено:</b><br>${out.errors.map(esc).join('<br>')}`, 'err');
+    if (!hasRepo || !ghToken.get()) return say('Чтобы сохранить, войдите через GitHub-токен (справа вверху).', 'err');
+    const btn = $<HTMLButtonElement>('#ed-save');
+    btn.disabled = true;
+    const who = modAuth.get()?.name ?? 'редактор на сайте';
+    try {
+      let id = editingId;
+      if (!id) {
+        id = slugify(out.title);
+        let n = 1;
+        while (await fileSha(`src/content/blog/${id}/index.md`)) id = `${slugify(out.title)}-${++n}`;
+      }
+      const dir = `src/content/blog/${id}`;
+      // сначала картинки (только те, что остались в тексте), потом сам текст
+      const used = [...images.keys()].filter((n) => body.value.includes(`./${n}`));
+      let i = 0;
+      for (const name of used) {
+        say(`Загружаем картинки… ${++i} из ${used.length}`);
+        await writeFile(`${dir}/${name}`, await blobToBase64(images.get(name)!.blob), `Блог: картинка (${who})`, { base64: true, sha: null });
+      }
+      if (cover) {
+        say('Загружаем картинку над текстом…');
+        await writeFile(`${dir}/cover.${cover.ext}`, await blobToBase64(cover.blob), `Блог: картинка «${out.title}» (${who})`, { base64: true });
+      }
+      say('Сохраняем запись…');
+      await writeFile(`${dir}/index.md`, out.text, `${editingId ? 'Изменено' : 'Новая запись'}: ${out.title} (${who})`, { sha: editingId ? editingSha ?? undefined : null });
+      for (const n of used) images.delete(n);
+      const isNew = !editingId;
+      editingId = id;
+      editingSha = (await fileSha(`${dir}/index.md`)) ?? null;
+      orig = splitMd(out.text).fm;
+      cover = null;
+      coverRemoved = false;
+      dirty = false;
+      history.replaceState(null, '', `?post=${id}`);
+      $('#ed-mode').textContent = 'Правка записи';
+      $('#ed-del').hidden = false;
+      try { localStorage.removeItem(DRAFT_KEY); } catch {}
+      const link = field('draft').checked ? 'Это черновик — на сайте запись не появится, пока не снимете галочку.' : `Сайт обновится через 1–2 минуты: <a href="${base}/blog/${id}/">${esc(out.title)}</a>.`;
+      say(`<b>Сохранено.</b> ${link}${isNew ? ' Теперь эта страница — правка этой записи.' : ''}`, 'ok');
+    } catch (err) {
+      const m = err instanceof GhError && err.status === 409
+        ? 'Запись только что изменил кто-то другой. Обновите страницу и внесите правки ещё раз.'
+        : `Не удалось сохранить: ${esc((err as Error).message)}`;
+      say(m, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('#ed-del').addEventListener('click', async () => {
+    if (!editingId) return;
+    if (!ghToken.get()) return say('Чтобы удалить, войдите через GitHub-токен (справа вверху).', 'err');
+    if (!confirm(`Удалить запись «${field('title').value}» вместе с картинками? Вернуть её сможет только владелец через историю GitHub.`)) return;
+    const who = modAuth.get()?.name ?? 'редактор на сайте';
+    try {
+      const files = await listDir(`src/content/blog/${editingId}`);
+      // текст удаляем первым — тогда запись сразу пропадёт с сайта, даже если с картинками что-то пойдёт не так
+      files.sort((a, b) => (a.name === 'index.md' ? -1 : b.name === 'index.md' ? 1 : 0));
+      for (const f of files) {
+        say(`Удаляем… ${esc(f.name)}`);
+        await deleteFile(f.path, f.sha, `Удалена запись блога: ${editingId} (${who})`);
+      }
+      dirty = false;
+      say('<b>Запись удалена.</b> С сайта она пропадёт через 1–2 минуты.', 'ok');
+      setTimeout(() => (location.href = `${base}/editor/blog/`), 2500);
+    } catch (err) {
+      say(`Не удалось удалить: ${esc((err as Error).message)}`, 'err');
+    }
+  });
+
+  // ───────── Вход через GitHub-токен ─────────
+  async function renderAuth() {
+    const box = $('#ed-auth');
+    const token = ghToken.get();
+    if (!token) {
+      box.innerHTML = `<p class="label">Вход для сохранения</p>
+        <p class="hint">Тот же GitHub-токен, что в редакторе игр. Как его получить — в <a href="${base}/guide/#start">шпаргалке</a>.</p>
+        <div class="ed__login"><input class="field" type="password" id="gh-token" placeholder="ghp_… или github_pat_…" /><button class="btn btn--ink" type="button" id="gh-in">Войти</button></div>`;
+      $('#gh-in').addEventListener('click', async () => {
+        const v = $<HTMLInputElement>('#gh-token').value.trim();
+        if (!v) return;
+        ghToken.set(v);
+        await renderAuth();
+        if (editingId) await loadPost(editingId);
+      });
+      return;
+    }
+    box.innerHTML = '<p class="hint">Проверяем вход…</p>';
+    try {
+      const me = await whoAmI();
+      box.innerHTML = `<p class="label">Вы вошли как ${esc(me.login)}</p>
+        <p class="hint">${me.canWrite ? 'Можно сохранять записи.' : 'У этого аккаунта нет права записи — попросите владельца добавить вас.'}</p>
+        <button class="link-btn" type="button" id="gh-out">Выйти</button>`;
+      $('#gh-out').addEventListener('click', () => {
+        ghToken.set(null);
+        renderAuth();
+      });
+    } catch (e) {
+      ghToken.set(null);
+      box.innerHTML = `<p class="label">Токен не подошёл</p><p class="hint">${esc((e as Error).message)}</p>`;
+      setTimeout(renderAuth, 2500);
+    }
+  }
+
+  // ───────── События ─────────
+  function changed() {
+    dirty = true;
+    renderPreview();
+    if (!editingId) {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ title: field('title').value, excerpt: field('excerpt').value, body: body.value, draft: field('draft').checked }));
+      } catch {}
+    }
+  }
+  form.addEventListener('input', changed);
+  form.addEventListener('change', changed);
+  $<HTMLSelectElement>('#ed-open').addEventListener('change', (e) => {
+    const v = (e.target as HTMLSelectElement).value;
+    location.href = v ? `${base}/editor/blog/?post=${v}` : `${base}/editor/blog/`;
+  });
+  $$<HTMLButtonElement>('button[data-view]').forEach((b) =>
+    b.addEventListener('click', () => {
+      $('.ed__grid').dataset.view = b.dataset.view!;
+      $$('button[data-view]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      $('.ed__tabs').scrollIntoView({ block: 'start' });
+    }),
+  );
+  addEventListener('beforeunload', (e) => {
+    if (dirty && (editingId || images.size)) e.preventDefault();
+  });
+
+  // ───────── Старт ─────────
+  (async () => {
+    field('date').value = toDateInput(new Date());
+    await renderAuth();
+    if (editingId) await loadPost(editingId);
+    else {
+      let draft: any = null;
+      try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch {}
+      if (draft?.title || draft?.body) {
+        fill({ title: draft.title, excerpt: draft.excerpt, draft: draft.draft }, draft.body ?? '');
+        say(`Восстановлен несохранённый черновик «${esc(draft.title || 'без названия')}» (картинки в нём нужно вставить заново). <button type="button" class="link-btn" id="draft-reset">Начать заново</button>`);
+        $('#draft-reset')?.addEventListener('click', () => {
+          localStorage.removeItem(DRAFT_KEY);
+          location.reload();
+        });
+      }
+    }
+    showCover();
+    renderPreview();
+  })();
+</script>
+
+<style>
+  .ed {
+    padding-top: clamp(20px, 3vw, 36px);
+  }
+  .ed__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px 32px;
+    margin-bottom: 1.6rem;
+  }
+  .ed__title {
+    font-size: clamp(1.8rem, 4vw, var(--s4));
+  }
+  .ed__open {
+    display: grid;
+    gap: 6px;
+    margin-top: 1rem;
+    max-width: 420px;
+  }
+  .ed__auth {
+    max-width: 380px;
+    padding: 0.9rem 1rem;
+    box-shadow: var(--sh-sm);
+  }
+  .ed__auth :global(p) {
+    margin: 0 0 0.4rem;
+  }
+  .ed__auth :global(.ed__login) {
+    display: flex;
+    gap: 8px;
+  }
+  .ed__auth :global(.ed__login .field) {
+    padding: 0.5em 0.7em;
+    font-size: 0.9rem;
+  }
+  .ed__tabs {
+    display: none;
+  }
+  .ed__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(20px, 3vw, 40px);
+    align-items: start;
+  }
+  .ed__form {
+    display: grid;
+    gap: 22px;
+    min-width: 0;
+  }
+  .ed__sec {
+    padding: clamp(16px, 2.2vw, 24px);
+    display: grid;
+    gap: 18px;
+    min-width: 0;
+  }
+  .f {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+  .f2 {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 14px;
+    align-items: end;
+  }
+  .f--short {
+    min-height: 4.5rem;
+  }
+  .f--body {
+    min-height: 24rem;
+    font-size: 1rem;
+    line-height: 1.6;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+  .hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ink-2);
+  }
+  #body-err {
+    color: var(--red);
+    font-weight: 600;
+  }
+  .link-btn {
+    padding: 0;
+    font: 600 0.85rem var(--f-body);
+    color: var(--ink-2);
+    background: none;
+    border: 0;
+    border-bottom: 1.5px solid currentColor;
+    cursor: pointer;
+    justify-self: start;
+  }
+  .link-btn:hover {
+    color: var(--red);
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .check input {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: #15130f;
+  }
+  .ed__draft {
+    padding-bottom: 0.7rem;
+  }
+
+  /* панель оформления над текстом */
+  .mdbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: var(--bw) solid var(--line);
+    border-bottom: 0;
+    border-radius: var(--r-tag) var(--r-tag) 0 0;
+    background: var(--paper-2);
+    overflow: hidden;
+  }
+  .mdbar button,
+  .mdbar__img {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.5em 0.8em;
+    font: 600 0.88rem var(--f-body);
+    color: var(--ink);
+    background: none;
+    border: 0;
+    border-right: var(--bw-thin) solid var(--line);
+    cursor: pointer;
+  }
+  .mdbar button:hover,
+  .mdbar__img:hover {
+    background: var(--yellow);
+    color: #15130f;
+  }
+  .mdbar__img {
+    position: relative;
+    margin-left: auto;
+    border-right: 0;
+    border-left: var(--bw-thin) solid var(--line);
+  }
+  .mdbar__img :global(.ico) {
+    width: 1em;
+    height: 1em;
+  }
+
+  .cover-in {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .cover-in__pv {
+    flex: none;
+    width: 160px;
+    aspect-ratio: 16 / 9;
+    display: grid;
+    place-items: center;
+    border: var(--bw-thin) dashed var(--ink-2);
+    border-radius: var(--r-tag);
+    overflow: hidden;
+    font-size: 0.8rem;
+  }
+  .cover-in__pv :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .cover-in > div {
+    position: relative;
+    display: grid;
+    gap: 8px;
+  }
+  .cover-in label.btn {
+    justify-self: start;
+  }
+
+  .ed__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    align-items: center;
+  }
+  .ed__del {
+    margin-left: auto;
+  }
+  .ed__msg {
+    font-weight: 500;
+  }
+  .ed__msg:empty {
+    display: none;
+  }
+  .ed__msg.is-ok,
+  .ed__msg.is-err {
+    padding: 0.7rem 0.9rem;
+    border: var(--bw-thin) solid var(--line);
+    border-radius: var(--r-tag);
+  }
+  .ed__msg.is-ok {
+    background: color-mix(in srgb, var(--green) 25%, var(--surface));
+  }
+  .ed__msg.is-err {
+    background: color-mix(in srgb, var(--red) 18%, var(--surface));
+  }
+
+  /* предпросмотр — как страница записи */
+  .ed__preview {
+    position: sticky;
+    top: 88px;
+    max-height: calc(100vh - 100px);
+    overflow: auto;
+    display: grid;
+    gap: 12px;
+    padding: 4px 8px 12px 4px;
+    scrollbar-width: thin;
+  }
+  .ed__preview > p {
+    margin: 0;
+  }
+  .pv {
+    padding: clamp(18px, 2.4vw, 30px);
+    min-width: 0;
+  }
+  .pv :global(.pv__t) {
+    font-size: clamp(1.6rem, 3vw, var(--s4));
+    margin: 0.6rem 0 0.8rem;
+    overflow-wrap: anywhere;
+  }
+  .pv :global(.pv__lead) {
+    font-size: var(--s1);
+    color: var(--ink-2);
+  }
+  .pv :global(.pv__draft) {
+    color: var(--red);
+  }
+  .pv :global(.pv__cover) {
+    display: block;
+    width: 100%;
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-panel);
+    margin: 1.2rem 0 1.6rem;
+  }
+  .pv :global(.prose img) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  @media (max-width: 960px) {
+    .ed__tabs {
+      display: flex;
+      position: sticky;
+      top: 62px;
+      z-index: 20;
+      margin-bottom: 16px;
+      border: var(--bw) solid var(--line);
+      border-radius: var(--r-btn);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .ed__tabs button {
+      flex: 1;
+      padding: 0.7em;
+      font: 700 0.85rem var(--f-mono);
+      text-transform: uppercase;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .ed__tabs button[aria-selected='true'] {
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .ed__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ed__grid[data-view='form'] .ed__preview,
+    .ed__grid[data-view='preview'] .ed__form {
+      display: none;
+    }
+    .ed__preview {
+      position: static;
+      max-height: none;
+      overflow: visible;
+    }
+  }
+  @media (max-width: 560px) {
+    .f2 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .cover-in {
+      flex-direction: column;
+    }
+  }
+</style>

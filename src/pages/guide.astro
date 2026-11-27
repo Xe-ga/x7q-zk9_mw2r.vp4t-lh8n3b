@@ -23,8 +23,9 @@ const repoUrl = `https://github.com/${REPO.name}`;
       <a href="#start"><b>1</b>Первый вход</a>
       <a href="#add"><b>2</b>Добавить игру</a>
       <a href="#fields"><b>3</b>Что писать в анкете</a>
-      <a href="#daily"><b>4</b>Заявки и комментарии</a>
-      <a href="#broken"><b>5</b>Если что-то сломалось</a>
+      <a href="#blog"><b>4</b>Блог</a>
+      <a href="#daily"><b>5</b>Заявки и комментарии</a>
+      <a href="#broken"><b>6</b>Если что-то сломалось</a>
     </nav>
 
     <!-- 1 -->
@@ -177,8 +178,39 @@ const repoUrl = `https://github.com/${REPO.name}`;
     </section>
 
     <!-- 4 -->
+    <section class="guide__sec" id="blog" aria-labelledby="blog-h">
+      <h2 id="blog-h"><span class="guide__n">4</span>Написать в блог</h2>
+      <div class="cards">
+        <div class="card">
+          <span class="card__ico"><Icon name="newspaper" /></span>
+          <h3>Новая запись</h3>
+          <p>Откройте раздел «Блог» — на панели модератора появится кнопка «Новая запись». Или сразу <a href={u('/editor/blog/')}>редактор блога</a>.</p>
+        </div>
+        <div class="card">
+          <span class="card__ico"><Icon name="pen" /></span>
+          <h3>Текст</h3>
+          <p>Пишите как обычно. Кнопки над текстом: <b>Ж</b>, <i>К</i>, подзаголовок, список, цитата, ссылка.</p>
+        </div>
+        <div class="card">
+          <span class="card__ico"><Icon name="upload" /></span>
+          <h3>Картинки</h3>
+          <p><kbd>Ctrl</kbd>+<kbd>V</kbd> в тексте — картинка встанет туда, где курсор. Вне текста — станет картинкой над записью.</p>
+        </div>
+        <div class="card">
+          <span class="card__ico"><Icon name="refresh" /></span>
+          <h3>Править и удалять</h3>
+          <p>На странице записи — «Изменить эту страницу». Там же внизу — «Удалить запись».</p>
+        </div>
+      </div>
+      <ul class="ticks">
+        <li>Справа сразу видно, как запись будет выглядеть на сайте. На телефоне — вкладка «Предпросмотр».</li>
+        <li>Галочка «Черновик» — запись сохранится, но на сайте не появится, пока её не снимете.</li>
+      </ul>
+    </section>
+
+    <!-- 5 -->
     <section class="guide__sec" id="daily" aria-labelledby="daily-h">
-      <h2 id="daily-h"><span class="guide__n">4</span>Заявки и комментарии</h2>
+      <h2 id="daily-h"><span class="guide__n">5</span>Заявки и комментарии</h2>
       <div class="cards cards--2">
         <div class="card">
           <span class="card__ico"><Icon name="comments" /></span>
@@ -199,9 +231,9 @@ const repoUrl = `https://github.com/${REPO.name}`;
       </div>
     </section>
 
-    <!-- 5 -->
+    <!-- 6 -->
     <section class="guide__sec" id="broken" aria-labelledby="broken-h">
-      <h2 id="broken-h"><span class="guide__n">5</span>Если что-то сломалось</h2>
+      <h2 id="broken-h"><span class="guide__n">6</span>Если что-то сломалось</h2>
       <dl class="fields">
         <div><dt>«Сохранить» выдаёт ошибку</dt><dd>Скорее всего, токен истёк или удалён. Сделайте новый (шаг 1) и вставьте в редактор.</dd></div>
         <div><dt>Сайт не обновился за 5 минут</dt><dd>Откройте <a href={`${repoUrl}/actions`} rel="noopener" target="_blank">вкладку Actions</a> на GitHub. Красный крестик — ошибка при сборке, чаще всего из-за неправильной ссылки. Откройте последнюю игру в редакторе и проверьте поля.</dd></div>

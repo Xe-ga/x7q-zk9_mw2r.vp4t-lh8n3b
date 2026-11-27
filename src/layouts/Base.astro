@@ -16,8 +16,13 @@ interface Props {
 }
 const { title, description = SITE.tagline, image, noindex = false, edit } = Astro.props;
 const adminUrl = (p: string) => u('/admin/index.html') + '#/collections/' + p;
-// карточки игр правятся в редакторе на сайте, остальное — в админке
-const editUrl = (p: string) => (p.startsWith('games/entries/') ? u(`/editor/?game=${p.split('/').at(-1)}`) : adminUrl(p));
+// карточки игр и записи блога правятся в редакторах на сайте, остальное — в админке
+const editUrl = (p: string) =>
+  p.startsWith('games/entries/')
+    ? u(`/editor/?game=${p.split('/').at(-1)}`)
+    : p.startsWith('blog/entries/')
+      ? u(`/editor/blog/?post=${p.split('/').at(-1)}`)
+      : adminUrl(p);
 const fullTitle = title ? `${title} — ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
 const path = Astro.url.pathname.replace(import.meta.env.BASE_URL.replace(/\/$/, ''), '') || '/';
 const nav = [
@@ -117,7 +122,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <aside class="modbar" id="modbar" hidden aria-label="Панель модератора">
       <span class="modbar__who label"><Icon name="user" /><span id="modbar-name"></span></span>
       {edit && <a class="modbar__btn modbar__btn--main" href={editUrl(edit)}><Icon name="pen" />Изменить эту страницу</a>}
-      <a class="modbar__btn" href={u('/editor/')}><Icon name="tag" />Новая игра</a>
+      {path.startsWith('/blog') || path.startsWith('/editor/blog')
+        ? <a class="modbar__btn" href={u('/editor/blog/')}><Icon name="newspaper" />Новая запись</a>
+        : <a class="modbar__btn" href={u('/editor/')}><Icon name="tag" />Новая игра</a>}
       <a class="modbar__btn" href={u('/moderator/')}><Icon name="comments" />Заявки</a>
       <a class="modbar__btn" href={u('/guide/')}><Icon name="info-circle" />Шпаргалка</a>
       <a class="modbar__btn" href={u('/admin/index.html')}><Icon name="cog" />Админка</a>

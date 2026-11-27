@@ -95,3 +95,21 @@ export async function writeFile(path: string, content: string, message: string, 
     }),
   });
 }
+
+/** Список файлов в папке репозитория (пусто, если папки нет). */
+export async function listDir(path: string): Promise<{ name: string; path: string; sha: string; type: string }[]> {
+  try {
+    return await api(`/repos/${REPO.name}/contents/${encodeURI(path)}?ref=${REPO.branch}`);
+  } catch (e) {
+    if (e instanceof GhError && e.status === 404) return [];
+    throw e;
+  }
+}
+
+/** Удалить файл из репозитория. */
+export async function deleteFile(path: string, sha: string, message: string) {
+  return api(`/repos/${REPO.name}/contents/${encodeURI(path)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ message, sha, branch: REPO.branch }),
+  });
+}
