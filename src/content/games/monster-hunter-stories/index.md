@@ -8,6 +8,7 @@ developer: Capcom
 year: 2016
 genres:
   - JRPG
+cover: ./cover.jpg
 translations:
   - type: manual
     verdict: untested
