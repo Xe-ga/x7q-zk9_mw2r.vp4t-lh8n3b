@@ -152,6 +152,19 @@ const DATA = {
       </aside>
     </div>
 
+    <!-- Обрезка обложки -->
+    <dialog class="crop panel" id="crop" aria-labelledby="crop-h">
+      <h2 class="crop__h" id="crop-h">Обрезать обложку</h2>
+      <p class="hint">Перетащите картинку мышкой или пальцем, приблизьте ползунком или колёсиком. Рамка — как обложка на сайте.</p>
+      <div class="crop__stage" id="crop-stage"><img id="crop-img" alt="" draggable="false" /></div>
+      <label class="crop__zoom"><span class="label">Масштаб</span><input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="1" /></label>
+      <div class="crop__btns">
+        <button type="button" class="btn btn--primary" id="crop-ok">Готово</button>
+        <button type="button" class="btn" id="crop-full" title="Сайт сам покажет середину картинки">Без обрезки</button>
+        <button type="button" class="link-btn" id="crop-cancel">Отмена</button>
+      </div>
+    </dialog>
+
     <!-- Шаблон одного перевода -->
     <template id="tr-tpl">
       <fieldset class="etr panel">
@@ -514,14 +527,97 @@ const DATA = {
     const blob: Blob = await new Promise((r) => c.toBlob((b) => r(b!), 'image/jpeg', 0.9));
     return { blob, ext: 'jpg' };
   }
-  $<HTMLInputElement>('#f-cover').addEventListener('change', async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    const { blob, ext } = await shrinkImage(file);
+  function setCover(blob: Blob, ext: string) {
     if (newCover) URL.revokeObjectURL(newCover.url);
     newCover = { blob, ext, url: URL.createObjectURL(blob) };
     showCover();
     changed();
+  }
+
+  // ── Обрезка: рамка 4:5, картинку двигают и приближают ──
+  const crop = $<HTMLDialogElement>('#crop');
+  const stage = $('#crop-stage');
+  const cimg = $<HTMLImageElement>('#crop-img');
+  const zoomIn = $<HTMLInputElement>('#crop-zoom');
+  let cropFile: File | null = null;
+  let cv = { w: 0, h: 0, base: 1, zoom: 1, x: 0, y: 0 }; // x, y — левый верхний угол картинки в рамке
+
+  const scale = () => cv.base * cv.zoom;
+  function clampCrop() {
+    const W = stage.clientWidth, H = stage.clientHeight, s = scale();
+    cv.x = Math.min(0, Math.max(W - cv.w * s, cv.x));
+    cv.y = Math.min(0, Math.max(H - cv.h * s, cv.y));
+    cimg.style.transform = `translate(${cv.x}px, ${cv.y}px) scale(${s})`;
+  }
+  function zoomTo(z: number, cx = stage.clientWidth / 2, cy = stage.clientHeight / 2) {
+    const before = scale();
+    cv.zoom = Math.min(4, Math.max(1, z));
+    const k = scale() / before;
+    cv.x = cx - (cx - cv.x) * k;
+    cv.y = cy - (cy - cv.y) * k;
+    zoomIn.value = String(cv.zoom);
+    clampCrop();
+  }
+  function openCrop(file: File) {
+    cropFile = file;
+    const url = URL.createObjectURL(file);
+    cimg.onload = () => {
+      crop.showModal();
+      const W = stage.clientWidth, H = stage.clientHeight;
+      cv = { w: cimg.naturalWidth, h: cimg.naturalHeight, base: Math.max(W / cimg.naturalWidth, H / cimg.naturalHeight), zoom: 1, x: 0, y: 0 };
+      // по центру, как сайт показал бы без обрезки
+      cv.x = (W - cv.w * cv.base) / 2;
+      cv.y = (H - cv.h * cv.base) / 2;
+      zoomIn.value = '1';
+      clampCrop();
+    };
+    cimg.src = url;
+  }
+  let drag: { id: number; sx: number; sy: number; x: number; y: number } | null = null;
+  stage.addEventListener('pointerdown', (e) => {
+    drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: cv.x, y: cv.y };
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    cv.x = drag.x + e.clientX - drag.sx;
+    cv.y = drag.y + e.clientY - drag.sy;
+    clampCrop();
+  });
+  stage.addEventListener('pointerup', () => (drag = null));
+  stage.addEventListener('pointercancel', () => (drag = null));
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    zoomTo(cv.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  zoomIn.addEventListener('input', () => zoomTo(Number(zoomIn.value)));
+  function closeCrop() {
+    crop.close();
+    URL.revokeObjectURL(cimg.src);
+    $<HTMLInputElement>('#f-cover').value = '';
+  }
+  $('#crop-ok').addEventListener('click', async () => {
+    const s = scale();
+    const c = document.createElement('canvas');
+    c.width = 800;
+    c.height = 1000;
+    c.getContext('2d')!.drawImage(cimg, -cv.x / s, -cv.y / s, stage.clientWidth / s, stage.clientHeight / s, 0, 0, 800, 1000);
+    const blob: Blob = await new Promise((r) => c.toBlob((b) => r(b!), 'image/jpeg', 0.9));
+    setCover(blob, 'jpg');
+    closeCrop();
+  });
+  $('#crop-full').addEventListener('click', async () => {
+    const { blob, ext } = await shrinkImage(cropFile!);
+    setCover(blob, ext);
+    closeCrop();
+  });
+  $('#crop-cancel').addEventListener('click', closeCrop);
+  crop.addEventListener('cancel', () => URL.revokeObjectURL(cimg.src));
+
+  $<HTMLInputElement>('#f-cover').addEventListener('change', (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file) openCrop(file);
   });
   $('#f-cover-clear').addEventListener('click', () => {
     if (newCover) URL.revokeObjectURL(newCover.url);
@@ -761,11 +857,12 @@ const DATA = {
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     changed();
   });
-  $$<HTMLButtonElement>('[data-view]').forEach((b) =>
+  // вкладки «Анкета / Предпросмотр» — только кнопки (у самой сетки тот же атрибут, клик по ней не должен ничего делать)
+  $$<HTMLButtonElement>('button[data-view]').forEach((b) =>
     b.addEventListener('click', () => {
       $('.ed__grid').dataset.view = b.dataset.view!;
-      $$('[data-view]').forEach((x) => x.tagName === 'BUTTON' && x.setAttribute('aria-selected', String(x === b)));
-      window.scrollTo({ top: 0 });
+      $$('button[data-view]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      $('.ed__tabs').scrollIntoView({ block: 'start' });
     }),
   );
   addEventListener('beforeunload', (e) => {
@@ -1016,11 +1113,67 @@ const DATA = {
     object-fit: cover;
   }
   .cover-in > div {
+    position: relative; /* скрытое поле файла остаётся рядом с кнопкой, фокус не уводит наверх */
     display: grid;
     gap: 8px;
   }
   .cover-in label.btn {
     justify-self: start;
+  }
+
+  /* окно обрезки */
+  .crop {
+    width: min(420px, calc(100vw - 24px));
+    padding: 1.2rem;
+    color: var(--ink);
+    box-shadow: var(--sh-lg);
+  }
+  .crop::backdrop {
+    background: rgba(21, 19, 15, 0.6);
+  }
+  .crop__h {
+    font-size: var(--s1);
+    margin-bottom: 0.4rem;
+  }
+  .crop__stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    margin: 0.9rem 0;
+    overflow: hidden;
+    border: var(--bw) solid var(--line);
+    border-radius: var(--r-card);
+    background: var(--paper-2);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .crop__stage:active {
+    cursor: grabbing;
+  }
+  .crop__stage img {
+    position: absolute;
+    left: 0;
+    top: 0;
+    max-width: none;
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  .crop__zoom {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 12px;
+  }
+  .crop__zoom input {
+    accent-color: #15130f;
+  }
+  .crop__btns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 1rem;
   }
 
   /* перевод в анкете */
