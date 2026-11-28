@@ -11,6 +11,7 @@ cover: ./cover.jpg
 translations:
   - type: manual
     verdict: great
+    moderator: puchevachi
     translators:
       - gektor
     sourceUrl: https://romhacking.ru/index/8-2874

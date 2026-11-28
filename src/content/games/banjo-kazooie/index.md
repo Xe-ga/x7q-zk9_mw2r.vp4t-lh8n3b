@@ -11,6 +11,7 @@ cover: ./cover.jpg
 translations:
   - type: manual
     verdict: great
+    moderator: puchevachi
     translators:
       - chief-net
     sourceUrl: http://chief-net.ru/index.php

@@ -344,6 +344,25 @@ const DATA = {
   let dirty = false;
   let trCounter = 0;
 
+  // ───────── Текущий модератор (вошёл ключом на /moderator/) ─────────
+  function currentMod(): { id: string; name: string; isNew: boolean } | null {
+    const name = modAuth.get()?.name?.trim();
+    if (!name || /демо/i.test(name)) return null;
+    const found = D.moderators.find((m: any) => m.name.toLowerCase() === name.toLowerCase() || m.id === slugify(name));
+    return found ? { ...found, isNew: false } : { id: slugify(name), name, isNew: true };
+  }
+
+  {
+    const me = currentMod();
+    if (me?.isNew) {
+      const opt = document.createElement('option');
+      opt.value = me.id;
+      opt.textContent = me.name;
+      tpl.content.querySelector('select[data-f=moderator]')!.appendChild(opt);
+      D.moderators.push({ id: me.id, name: me.name });
+    }
+  }
+
   // ───────── Переводы ─────────
   function addTranslation(t: Tr = {}, isNew = true) {
     const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
@@ -353,7 +372,7 @@ const DATA = {
     trs.appendChild(node);
     fillTranslation(node, {
       type: 'manual', status: 'full',
-      moderator: isNew ? D.moderators.find((m: any) => m.name === modAuth.get()?.name)?.id ?? '' : '',
+      moderator: isNew ? currentMod()?.id ?? '' : '',
       date: isNew && editingId ? new Date().toISOString() : '',
       ...t,
     });
@@ -829,7 +848,7 @@ const DATA = {
         originalUrl: t.port ? t.originalUrl : '',
         sourceUrl: t.sourceUrl,
         download: t.download,
-        moderator: t.moderator,
+        moderator: t.moderator || (t.verdict && t.verdict !== 'untested' ? currentMod()?.id ?? '' : ''),
         moderatorNote: t.moderatorNote,
         translatorNote: t.translatorNote,
         date: t.date,
@@ -859,7 +878,9 @@ const DATA = {
       draft: g.draft,
     });
     const text = `---\n${toYaml(fm, { lineWidth: 0 })}---\n${g.body.trim()}\n`;
-    return { errors, text, title: g.title, newTranslators, newPublisher };
+    const me = currentMod();
+    const newModerator = me?.isNew && translations.some((t: any) => t.moderator === me.id) ? me : null;
+    return { errors, text, title: g.title, newTranslators, newPublisher, newModerator };
   }
 
   // ───────── Сообщения и вход ─────────
@@ -935,6 +956,13 @@ const DATA = {
       if (out.newPublisher) {
         say(`Добавляем издателя «${esc(out.newPublisher.name)}»…`);
         await writeFile(`src/content/publishers/${out.newPublisher.id}.json`, JSON.stringify({ name: out.newPublisher.name }, null, 2) + '\n', `Новый издатель: ${out.newPublisher.name} (${who})`);
+      }
+      if (out.newModerator && !(await fileSha(`src/content/moderators/${out.newModerator.id}.md`))) {
+        say(`Заводим страницу модератора «${esc(out.newModerator.name)}»…`);
+        await writeFile(`src/content/moderators/${out.newModerator.id}.md`, `---
+name: ${JSON.stringify(out.newModerator.name)}
+---
+`, `Новый модератор: ${out.newModerator.name}`);
       }
       if (newCover) {
         say('Загружаем обложку…');
