@@ -519,7 +519,7 @@ const DATA = {
   }
   function coverHtml(title: string, platform: string) {
     const url = newCover?.url ?? (editingId ? D.coverUrls[editingId] : null);
-    if (url) return `<div class="cover-box" style="--bg:url('${esc(url)}')"><img class="cover-img" src="${esc(url)}" alt="" onload="const r=this.naturalWidth/this.naturalHeight;this.parentNode.classList.toggle('cover-box--fill',r>=0.85&&r<=1.18)"></div>`;
+    if (url) return `<div class="cover-box" style="--bg:url('${esc(url)}')"><img class="cover-img" src="${esc(url)}" alt="" onload="const r=this.naturalWidth/this.naturalHeight;this.parentNode.classList.toggle('cover-box--fill',r>=0.97&&r<=1.03)"></div>`;
     const FB = ['var(--teal)', 'var(--yellow)', 'var(--magenta)', 'var(--orange)', 'var(--sky)', 'var(--green)'];
     const idx = [...(platform || 'x')].reduce((a, c) => a + c.charCodeAt(0), 0) % FB.length;
     return `<div class="cover-fallback" style="--fb:${FB[idx]}">${platform ? icon('platforms', platform, 'cover-fallback__ico') : ''}<span class="cover-fallback__title">${esc(title || 'Название игры')}</span></div>`;
@@ -626,7 +626,7 @@ const DATA = {
   // ───────── Обложка ─────────
   function showCover() {
     const url = newCover?.url ?? (editingId ? D.coverUrls[editingId] : null);
-    $('#f-cover-pv').innerHTML = url ? `<div class="cover-box" style="--bg:url('${esc(url)}')"><img class="cover-img" src="${esc(url)}" alt="" onload="const r=this.naturalWidth/this.naturalHeight;this.parentNode.classList.toggle('cover-box--fill',r>=0.85&&r<=1.18)"></div>` : '<span class="muted">нет</span>';
+    $('#f-cover-pv').innerHTML = url ? `<div class="cover-box" style="--bg:url('${esc(url)}')"><img class="cover-img" src="${esc(url)}" alt="" onload="const r=this.naturalWidth/this.naturalHeight;this.parentNode.classList.toggle('cover-box--fill',r>=0.97&&r<=1.03)"></div>` : '<span class="muted">нет</span>';
     ($('#f-cover-clear') as HTMLElement).hidden = !newCover;
   }
   async function shrinkImage(file: File): Promise<{ blob: Blob; ext: string }> {
