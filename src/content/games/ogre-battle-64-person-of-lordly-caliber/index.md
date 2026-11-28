@@ -6,8 +6,8 @@ developer: Quest Corporation
 year: 2000
 genres:
   - RPG
-  - TRPG
   - RTS
+  - TRPG
 cover: ./cover.jpg
 translations:
   - type: ai-edited
@@ -15,7 +15,7 @@ translations:
     translators:
       - vyacheslav-botnya
     sourceUrl: https://vk.ru/club242657985
-    download: https://t.me/T_T_Puch/191/193
+    download: https://t.me/T_T_PuchDruch/191/193
 date: 2026-11-28T01:33:48.831Z
 ---
 Судьба империи решается на поле боя.
