@@ -14,7 +14,7 @@ translations:
       - "rednose"
     sourceUrl: "https://www.emu-land.net/forum/index.php?action=profile;u=123469"
     download: "https://t.me/T_T_PuchDruch/191/278"
-    status: "wip"
+    updating: true
     statusNote: "версия перевода 0.3"
     moderator: "puchevachi"
 date: 2026-11-19T05:40:10+05:00

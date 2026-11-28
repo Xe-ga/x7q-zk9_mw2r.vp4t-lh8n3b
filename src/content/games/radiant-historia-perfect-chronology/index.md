@@ -14,7 +14,7 @@ translations:
       - "inspektor-gadzhet"
     sourceUrl: "https://t.me/inspect_gadget"
     download: "https://t.me/T_T_PuchDruch/4/203"
-    status: "wip"
+    updating: true
     statusNote: "версия перевода 0.4"
     moderator: "puchevachi"
 date: 2026-11-17T17:41:15+05:00

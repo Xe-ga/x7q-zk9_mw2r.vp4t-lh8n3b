@@ -15,7 +15,7 @@ translations:
       - "byuro-perevodov-konato"
     sourceUrl: "https://t.me/vibecuckolding"
     download: "https://t.me/T_T_PuchDruch/4/490"
-    status: "wip"
+    updating: true
     statusNote: "версия перевода 0.1"
     moderator: "puchevachi"
 date: 2026-11-28T14:00:15+05:00

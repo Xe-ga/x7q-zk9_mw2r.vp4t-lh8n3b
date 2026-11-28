@@ -13,7 +13,7 @@ translations:
       - "tea-paketik"
     sourceUrl: "https://t.me/teaemu"
     download: "https://t.me/T_T_PuchDruch/2/483"
-    status: "wip"
+    updating: true
     statusNote: "версия перевода 0.1"
     moderator: "puchevachi"
 date: 2026-11-28T13:59:53+05:00
