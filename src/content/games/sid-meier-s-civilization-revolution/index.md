@@ -20,6 +20,7 @@ translations:
   - type: manual
     verdict: no
     verdictLabel: Поломанный
+    verdictNote: Переодические зависания
     statusNote: Оригинальный ром перевода Diamondel
     translators:
       - diamondel
