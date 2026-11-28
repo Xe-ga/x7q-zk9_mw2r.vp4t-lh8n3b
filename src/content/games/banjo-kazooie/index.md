@@ -5,6 +5,7 @@ publisher: nintendo
 developer: Rare
 year: 1998
 genres:
+  - Платформер
   - 3D Платформер
 cover: ./cover.jpg
 translations:
