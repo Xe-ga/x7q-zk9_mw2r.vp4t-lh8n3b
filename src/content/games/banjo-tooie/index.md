@@ -16,6 +16,7 @@ translations:
     sourceUrl: https://www.emu-land.net/forum/index.php?action=profile;u=123469
     download: https://t.me/T_T_PuchDruch/191/271
 date: 2026-11-28T07:30:41.355Z
+draft: true
 ---
 Грантильда вернулась - и теперь ей нечего терять!
 
