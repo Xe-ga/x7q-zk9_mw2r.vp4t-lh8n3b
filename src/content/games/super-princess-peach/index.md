@@ -8,7 +8,7 @@ genres:
   - "Платформер"
 cover: ./cover.jpg
 translations:
-  - type: "ai"
+  - type: "ai-edited"
     verdict: "untested"
     translators:
       - "inspektor-gadzhet"
