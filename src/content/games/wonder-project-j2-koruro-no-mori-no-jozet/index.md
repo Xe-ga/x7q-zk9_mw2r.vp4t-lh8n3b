@@ -14,7 +14,7 @@ translations:
     translators:
       - vyacheslav-botnya
     sourceUrl: https://vk.ru/club242657985
-    download: https://t.me/T_T_Puch/191/195
+    download: https://t.me/T_T_PuchDruch/191/195
 date: 2026-11-28T02:43:11.779Z
 ---
 Новая история о душе, скрытой в стальном сердце.
