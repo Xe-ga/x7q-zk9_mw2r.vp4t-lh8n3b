@@ -1,12 +1,12 @@
 ---
 title: Wonder Project J - Kikai no Shounen Pino
-platform: n64
+platform: snes
 publisher: enix
 developer: Almanic Corporation
 year: 1994
 genres:
-  - Point-and-Click Adventure
   - Life Simulation
+  - Point-and-Click Adventure
 cover: ./cover.jpg
 translations:
   - type: manual
