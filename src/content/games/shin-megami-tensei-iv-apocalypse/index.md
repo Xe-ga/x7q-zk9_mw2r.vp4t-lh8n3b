@@ -12,8 +12,7 @@ genres:
 cover: ./cover.jpg
 translations:
   - type: ai-edited
-    verdict: great
-    verdictLabel: "Никита против чертей 4: Пиздец"
+    verdict: untested
     translators:
       - molag
     sourceUrl: https://boosty.to/molagbaalny
