@@ -14,7 +14,7 @@ translations:
     translators:
       - gektor
     sourceUrl: https://romhacking.ru/index/8-2874
-    download: https://t.me/T_T_Puch/140/176
+    download: https://t.me/T_T_PuchDruch/140/176
 date: 2026-11-28T02:21:15.187Z
 ---
 Сможет ли робот обрести настоящее человеческое сердце?
